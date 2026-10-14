@@ -215,6 +215,7 @@ func SearchJavWithPrefixFilters(ctx context.Context, idolIDs []int64, tagIDs []i
 
 	var items []models.Jav
 	order := "jav.created_at DESC, jav.id DESC"
+	latestModified := latestVisibleJavFileModifiedSQL(directoryIDs)
 	var orderExpr clause.Expr
 	useExpr := false
 	switch sort {
@@ -222,6 +223,10 @@ func SearchJavWithPrefixFilters(ctx context.Context, idolIDs []int64, tagIDs []i
 		order = "jav.code ASC, jav.id ASC"
 	case "code_desc":
 		order = "jav.code DESC, jav.id DESC"
+	case "modified", "modified_desc":
+		order = latestModified + " DESC, jav.id DESC"
+	case "modified_asc":
+		order = latestModified + " ASC, jav.id ASC"
 	case "duration", "duration_desc":
 		order = "jav.duration_min DESC, jav.created_at DESC, jav.id DESC"
 	case "duration_asc":
@@ -1147,6 +1152,15 @@ func replaceJavUserTagsTx(tx *gorm.DB, javIDs, tagIDs []int64) error {
 		return fmt.Errorf("insert jav tag map: %w", err)
 	}
 	return nil
+}
+
+func latestVisibleJavFileModifiedSQL(directoryIDs []int64) string {
+	return `(SELECT MAX(vl_modified.modified_at)
+		FROM video_location vl_modified
+		JOIN directory d_modified ON d_modified.id = vl_modified.directory_id
+		WHERE vl_modified.jav_id = jav.id
+			AND ` + activeDirectoryWhereSQL("d_modified") +
+		directoryFilterSQL("vl_modified", directoryIDs) + `)`
 }
 
 func buildJavFilter(ctx context.Context, idolIDs []int64, tagIDs []int64, search, prefix string, directoryIDs []int64, filters JavSearchFilters) *gorm.DB {
@@ -2192,6 +2206,10 @@ func ListJavIdols(ctx context.Context, search, sort string, limit, offset int, d
 		order = "ji.created_at DESC, ji.id DESC"
 	case "recent_asc", "added_asc", "created_asc", "created_at_asc":
 		order = "ji.created_at ASC, ji.id ASC"
+	case "modified", "modified_desc":
+		order = "MAX(vl.modified_at) DESC, ji.id DESC"
+	case "modified_asc":
+		order = "MAX(vl.modified_at) ASC, ji.id ASC"
 	case "birth", "birth_date", "age", "birth_desc", "birth_date_desc", "age_asc":
 		order = "ji.birth_date IS NULL, ji.birth_date DESC, ji.name ASC"
 	case "birth_asc", "birth_date_asc", "age_desc":
