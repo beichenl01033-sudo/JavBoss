@@ -16,6 +16,7 @@ test('link overrides and URL state serialization round trip through one query mo
     selectedTags: ['tag'],
     page: 3,
     searchTerm: ' query ',
+    selectedDirectoryId: 4,
   })
   const state = store.getState()
   const video = links.buildVideoQueryLink(state, {}, '/library')
@@ -29,6 +30,12 @@ test('link overrides and URL state serialization round trip through one query mo
   assert.equal(parse(video).video.page, 3)
   assert.deepEqual(parse(video).video.tagIds, [9])
   assert.equal(parse(video).video.search, 'query')
+  assert.equal(parse(video).video.directoryId, 4)
+  assert.equal(new URL(video, 'http://localhost').searchParams.get('directory_id'), '4')
+  assert.equal(
+    parse(links.buildVideoQueryLink(state, { directoryId: null })).video.directoryId,
+    null
+  )
   const random = links.buildVideoQueryLink(
     state,
     { random: true, seed: 123, tempSort: 'recent' },

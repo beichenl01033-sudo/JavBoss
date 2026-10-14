@@ -40,6 +40,7 @@ export function createVideoSlice({ set, get, lists }) {
     selectedVideoIds: new Set(),
     selectedVideoMeta: {},
     searchTerm: '',
+    selectedDirectoryId: null,
     sortOrder: 'recent',
     videoTempSort: '',
     randomMode: false,
@@ -83,13 +84,19 @@ export function createVideoSlice({ set, get, lists }) {
       }
       set(next)
     },
+    setSelectedDirectoryId: (id) => {
+      const parsed = Number(id)
+      const selectedDirectoryId = Number.isFinite(parsed) && parsed > 0 ? parsed : null
+      set({ selectedDirectoryId, page: 1 })
+    },
     toggleTagFilter: (tagName) => {
       const { selectedTags } = get()
       const exists = selectedTags.includes(tagName)
       const next = exists ? selectedTags.filter((t) => t !== tagName) : [...selectedTags, tagName]
       set({ selectedTags: next, videoTempSort: '', page: 1 })
     },
-    clearFilters: () => set({ selectedTags: [], videoTempSort: '', page: 1 }),
+    clearFilters: () =>
+      set({ selectedTags: [], selectedDirectoryId: null, videoTempSort: '', page: 1 }),
     toggleSelectVideo: (video) => {
       const key = videoSelectionKey(video)
       if (!video || !video.id || !key) return

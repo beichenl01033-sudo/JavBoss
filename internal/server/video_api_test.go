@@ -21,7 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestListVideosIgnoresDirectoryIDsAndUsesEnabledDirectories(t *testing.T) {
+func TestListVideosFiltersByEnabledDirectory(t *testing.T) {
 	database, err := dbpkg.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open test database: %v", err)
@@ -35,22 +35,30 @@ func TestListVideosIgnoresDirectoryIDsAndUsesEnabledDirectories(t *testing.T) {
 		}
 	})
 
-	dir := models.Directory{Path: "/media/api-directory-scope"}
-	video := models.Video{Fingerprint: "api-directory-scope-video"}
-	if err := database.Create(&dir).Error; err != nil {
+	directories := []models.Directory{
+		{Path: "/media/api-directory-scope"},
+		{Path: "/media/api-directory-other"},
+	}
+	videos := []models.Video{
+		{Fingerprint: "api-directory-scope-video"},
+		{Fingerprint: "api-directory-other-video"},
+	}
+	if err := database.Create(&directories).Error; err != nil {
 		t.Fatalf("create directory: %v", err)
 	}
-	if err := database.Create(&video).Error; err != nil {
+	if err := database.Create(&videos).Error; err != nil {
 		t.Fatalf("create video: %v", err)
 	}
-	if _, err := dbpkg.UpsertVideoLocation(
-		context.Background(),
-		video.ID,
-		dir.ID,
-		"movie.mp4",
-		time.Unix(1710000000, 0).UTC(),
-	); err != nil {
-		t.Fatalf("create video location: %v", err)
+	for index := range directories {
+		if _, err := dbpkg.UpsertVideoLocation(
+			context.Background(),
+			videos[index].ID,
+			directories[index].ID,
+			"movie.mp4",
+			time.Unix(1710000000+int64(index), 0).UTC(),
+		); err != nil {
+			t.Fatalf("create video location: %v", err)
+		}
 	}
 
 	gin.SetMode(gin.TestMode)
@@ -77,18 +85,33 @@ func TestListVideosIgnoresDirectoryIDsAndUsesEnabledDirectories(t *testing.T) {
 		return payload
 	}
 
-	visible := requestList("directory_ids=0")
-	if visible.Total != 1 || len(visible.Items) != 1 {
-		t.Fatalf("enabled directory should remain visible despite directory_ids=0: %#v", visible)
+	all := requestList("")
+	if all.Total != 2 || len(all.Items) != 2 {
+		t.Fatalf("all enabled directories should be visible without a filter: %#v", all)
+	}
+
+	filtered := requestList("directory_id=" + strconv.FormatInt(directories[0].ID, 10))
+	if filtered.Total != 1 || len(filtered.Items) != 1 {
+		t.Fatalf("expected one video from selected directory: %#v", filtered)
+	}
+	if filtered.Items[0].DirectoryID != directories[0].ID {
+		t.Fatalf("unexpected directory: got %d want %d", filtered.Items[0].DirectoryID, directories[0].ID)
 	}
 
 	enabled := false
-	if _, err := dbpkg.UpdateDirectory(context.Background(), dir.ID, nil, nil, &enabled); err != nil {
+	if _, err := dbpkg.UpdateDirectory(context.Background(), directories[0].ID, nil, nil, &enabled); err != nil {
 		t.Fatalf("disable directory: %v", err)
 	}
-	hidden := requestList("directory_ids=" + strconv.FormatInt(dir.ID, 10))
+	hidden := requestList("directory_id=" + strconv.FormatInt(directories[0].ID, 10))
 	if hidden.Total != 0 || len(hidden.Items) != 0 {
-		t.Fatalf("disabled directory must remain hidden despite directory_ids: %#v", hidden)
+		t.Fatalf("disabled directory must remain hidden: %#v", hidden)
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/videos?directory_id=invalid", nil)
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("invalid directory status = %d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
 

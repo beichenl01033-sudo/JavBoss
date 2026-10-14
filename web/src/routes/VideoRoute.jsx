@@ -3,6 +3,7 @@ import { useStore } from '@/store'
 import { useShallow } from 'zustand/react/shallow'
 import { useCallback, useEffect } from 'react'
 import VideoView from '@/features/video/components/VideoView'
+import { hostPathsEnabled } from '@/utils/hostPath'
 
 export default function VideoRoute({
   hydrated,
@@ -49,6 +50,10 @@ export default function VideoRoute({
     toggleSelectVideo,
     loadMoreVideos,
     videoLoadingMore,
+    directories,
+    config,
+    selectedDirectoryId,
+    setSelectedDirectoryId,
   } = useStore(
     useShallow((state) => ({
       page: state.page,
@@ -69,6 +74,10 @@ export default function VideoRoute({
       toggleSelectVideo: state.toggleSelectVideo,
       loadMoreVideos: state.loadMoreVideos,
       videoLoadingMore: state.videoLoadingMore,
+      directories: state.directories,
+      config: state.config,
+      selectedDirectoryId: state.selectedDirectoryId,
+      setSelectedDirectoryId: state.setSelectedDirectoryId,
     }))
   )
   const requestKey = useStore(videoQueryKey)
@@ -124,6 +133,10 @@ export default function VideoRoute({
       onLoadMore={loadMoreVideos}
       loadingMore={videoLoadingMore}
       hasMore={videoWaterfallHasMore}
+      directories={directories}
+      selectedDirectoryId={selectedDirectoryId}
+      onDirectoryChange={setSelectedDirectoryId}
+      useHostPaths={hostPathsEnabled(config)}
     />
   )
 }

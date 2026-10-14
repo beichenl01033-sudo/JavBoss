@@ -14,6 +14,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
     viewMode,
     page,
     searchTerm,
+    selectedDirectoryId,
     videoTempSort,
     selectedTags,
     randomMode,
@@ -52,6 +53,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       viewMode: state.viewMode,
       page: state.page,
       searchTerm: state.searchTerm,
+      selectedDirectoryId: state.selectedDirectoryId,
       videoTempSort: state.videoTempSort,
       selectedTags: state.selectedTags,
       randomMode: state.randomMode,
@@ -166,6 +168,18 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       }
 
       const { video } = parsed
+      const current = useStore.getState()
+      const directorySelectionAvailable = (current.directories || []).some(
+        (directory) =>
+          !directory.is_delete &&
+          directory.enabled !== false &&
+          Number(directory.id) === Number(video.directoryId)
+      )
+      const selectedDirectoryId =
+        video.directoryId &&
+        ((current.directories || []).length === 0 || directorySelectionAvailable)
+          ? video.directoryId
+          : null
       useStore.setState({
         viewMode: 'video',
         javTempSort: '',
@@ -174,6 +188,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
         randomMode: video.random,
         randomSeed: video.random ? video.seed : null,
         searchTerm: video.search,
+        selectedDirectoryId,
         page: video.random ? 1 : video.page,
       })
       setSearchInput(video.search)
@@ -198,6 +213,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
           viewMode,
           page,
           searchTerm,
+          selectedDirectoryId,
           videoTempSort,
           selectedTags,
           randomMode,
@@ -260,6 +276,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       randomMode,
       randomSeed,
       searchTerm,
+      selectedDirectoryId,
       selectedTags,
       videoTempSort,
       tagsByName,

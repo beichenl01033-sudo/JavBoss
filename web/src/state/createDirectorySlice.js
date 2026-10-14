@@ -14,7 +14,14 @@ export function createDirectorySlice({ set, get, invalidateDirectoryScopedReques
       try {
         const directories = await fetchDirectories()
         const active = directories.filter((d) => !d.is_delete)
-        set({ directories: active })
+        const selectedDirectoryId = Number(get().selectedDirectoryId)
+        const selectionAvailable = active.some(
+          (directory) => directory.enabled !== false && Number(directory.id) === selectedDirectoryId
+        )
+        set({
+          directories: active,
+          selectedDirectoryId: selectionAvailable ? selectedDirectoryId : null,
+        })
       } catch (e) {
         console.error(zh('加载目录失败', 'Failed to load directories'), e)
       }
@@ -46,7 +53,15 @@ export function createDirectorySlice({ set, get, invalidateDirectoryScopedReques
       const scopeChanged =
         Object.prototype.hasOwnProperty.call(payload || {}, 'enabled') || Boolean(dir?.is_delete)
       if (scopeChanged) invalidateDirectoryScopedRequests()
-      set({ directories: next, ...(scopeChanged ? directoryScopeResetState() : {}) })
+      const selectionAvailable = next.some(
+        (directory) =>
+          directory.enabled !== false && Number(directory.id) === Number(state.selectedDirectoryId)
+      )
+      set({
+        directories: next,
+        selectedDirectoryId: selectionAvailable ? state.selectedDirectoryId : null,
+        ...(scopeChanged ? directoryScopeResetState() : {}),
+      })
       return dir
     },
     deleteDirectory: async (id) => {
@@ -56,7 +71,12 @@ export function createDirectorySlice({ set, get, invalidateDirectoryScopedReques
         .map((d) => (d.id === id ? dir : d))
         .filter((d) => d && !d.is_delete)
       invalidateDirectoryScopedRequests()
-      set({ directories: next, ...directoryScopeResetState() })
+      set({
+        directories: next,
+        selectedDirectoryId:
+          Number(state.selectedDirectoryId) === Number(id) ? null : state.selectedDirectoryId,
+        ...directoryScopeResetState(),
+      })
       return dir
     },
   }

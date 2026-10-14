@@ -12,6 +12,7 @@ export function buildVideoQueryLink(state, options = {}, pathname = '/') {
   for (const key of ['page', 'search', 'random', 'seed', 'tagIds']) {
     if (options[key] != null) video[key] = options[key]
   }
+  if (has(options, 'directoryId')) video.directoryId = options.directoryId
   video.search = String(video.search || '').trim()
   if (has(options, 'tempSort')) video.tempSort = normalizeVideoSort(options.tempSort, '')
   return buildUrlFromState({ ...current, view: 'video', video }, pathname)

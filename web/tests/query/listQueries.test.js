@@ -16,6 +16,10 @@ test('query keys include every effective filter and directory visibility', async
     queries.videoQueryKey({ ...state, directories: [{ id: 1, enabled: true }] })
   )
   assert.notEqual(
+    queries.videoQueryKey(state),
+    queries.videoQueryKey({ ...state, selectedDirectoryId: 7 })
+  )
+  assert.notEqual(
     queries.javQueryKey(state),
     queries.javQueryKey({ ...state, javFavoriteRatingEnabled: true, javFavoriteRatingMin: 3 })
   )
@@ -36,10 +40,12 @@ test('list resources are independent per store and forward cancellation to the A
     requests.push({ url, init })
     return Response.json({ items: [{ id: requests.length }], total: 100 })
   })
+  first.setState({ selectedDirectoryId: 7 })
   await first.getState().loadVideos()
   await second.getState().loadVideos()
   assert.equal(requests.length, 2)
   assert.ok(requests[0].init.signal instanceof AbortSignal)
+  assert.equal(new URL(requests[0].url, 'http://localhost').searchParams.get('directory_id'), '7')
   assert.notDeepEqual(first.getState().videos, second.getState().videos)
   first.setState({ javRandomMode: true, javRandomSeed: 42, javPage: 8 })
   await first.getState().loadJavs()
@@ -50,6 +56,23 @@ test('list resources are independent per store and forward cancellation to the A
   assert.equal(url.searchParams.get('sort'), 'random')
   await first.getState().loadMoreJavs()
   assert.equal(requests.length, 3)
+})
+
+test('disabling the selected directory clears the video filter', async (t) => {
+  const [{ createAppState }] = await loadModules(t, ['store.js'])
+  const store = createStore(createAppState)
+  store.setState({
+    directories: [{ id: 7, path: '/videos', enabled: true }],
+    selectedDirectoryId: 7,
+  })
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ id: 7, path: '/videos', enabled: false })
+  )
+
+  await store.getState().updateDirectory(7, { enabled: false })
+
+  assert.equal(store.getState().selectedDirectoryId, null)
+  assert.equal(store.getState().page, 1)
 })
 
 test('item edits merge into list data without losing unrelated fields or other entries', async (t) => {
