@@ -43,6 +43,7 @@ import { buildVideoFullPath } from '@/utils/display'
 import JavFavoriteModal from '@/features/favorites/components/JavFavoriteModal'
 import JavFavoriteManageModal from '@/features/favorites/components/JavFavoriteManageModal'
 import { zh } from '@/utils/i18n'
+import { hostPathsEnabled } from '@/utils/hostPath'
 import JavSelectionOpsModal from '@/features/jav/components/JavSelectionOpsModal'
 import JavSelectionFavoritesModal from '@/features/favorites/components/JavSelectionFavoritesModal'
 import JavSelectionTagsModal from '@/features/tags/components/JavSelectionTagsModal'
@@ -89,6 +90,9 @@ export default function App() {
     favoriteGroupsLoadingByType,
     favoriteGroupsErrorByType,
     loadJavFavoriteGroups,
+    directories,
+    selectedDirectoryId,
+    setSelectedDirectoryId,
   } = useStore(
     useShallow((s) => ({
       config: s.config,
@@ -134,6 +138,9 @@ export default function App() {
       favoriteGroupsLoadingByType: s.favoriteGroupsLoadingByType,
       favoriteGroupsErrorByType: s.favoriteGroupsErrorByType,
       loadJavFavoriteGroups: s.loadJavFavoriteGroups,
+      directories: s.directories,
+      selectedDirectoryId: s.selectedDirectoryId,
+      setSelectedDirectoryId: s.setSelectedDirectoryId,
     }))
   )
 
@@ -522,6 +529,7 @@ export default function App() {
         canGoForward={browserNavigation.canGoForward}
         isJavMode={isJavMode}
         javPrefix={javPrefix}
+        directoryId={selectedDirectoryId}
         onBrowserBack={handleBrowserBack}
         onBrowserForward={handleBrowserForward}
         onOpenDownload={() => setDownloadOpen(true)}
@@ -643,6 +651,10 @@ export default function App() {
         searchInput={searchInput}
         selectedCount={isJavMode ? javSelection.count : selectedCount}
         selectedFavoriteGroupId={activeSelectedFavoriteGroupId}
+        directories={directories}
+        selectedDirectoryId={selectedDirectoryId}
+        onDirectoryChange={setSelectedDirectoryId}
+        useHostPaths={hostPathsEnabled(config)}
       />
 
       <main className="page-main w-full pb-6 pt-0">
@@ -770,6 +782,7 @@ export default function App() {
         favoriteRatingEnabled={javFavoriteRatingEnabled}
         favoriteRatingMin={javFavoriteRatingMin}
         favoriteRatingMax={javFavoriteRatingMax}
+        directoryId={selectedDirectoryId}
       />
 
       {videoSettingsOpen && (

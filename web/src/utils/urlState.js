@@ -78,6 +78,7 @@ export const parseUrlState = (searchString = window.location.search, options = {
   const defaultView = options.defaultView === 'jav' ? 'jav' : 'video'
   const rawView = sp.get('view')
   const view = rawView === 'jav' ? 'jav' : rawView === 'video' ? 'video' : defaultView
+  const directoryId = parsePositiveInt(sp.get('directory_id'))
   const videoTempSort = normalizeVideoSort((sp.get('temp_sort') || '').trim(), '')
 
   const video = {
@@ -85,7 +86,6 @@ export const parseUrlState = (searchString = window.location.search, options = {
     search: (sp.get('search') || '').trim(),
     tempSort: videoTempSort,
     tagIds: parseIds(sp.get('tag_ids')),
-    directoryId: parsePositiveInt(sp.get('directory_id')),
     random: sp.get('random') === '1',
     seed: clampSeed(sp.get('seed')),
   }
@@ -135,11 +135,12 @@ export const parseUrlState = (searchString = window.location.search, options = {
     seed: clampSeed(sp.get('seed')),
   }
 
-  return { view, video, jav }
+  return { view, directoryId, video, jav }
 }
 
 export const buildUrlFromState = (state, basePath = window.location.pathname) => {
   const sp = new URLSearchParams()
+  if (state.directoryId) sp.set('directory_id', String(state.directoryId))
   if (state.view === 'jav') {
     sp.set('view', 'jav')
     if (
@@ -220,7 +221,6 @@ export const buildUrlFromState = (state, basePath = window.location.pathname) =>
   if (state.video.tagIds?.length) {
     sp.set('tag_ids', [...state.video.tagIds].sort((a, b) => a - b).join(','))
   }
-  if (state.video.directoryId) sp.set('directory_id', String(state.video.directoryId))
   if (state.video.random) {
     sp.set('random', '1')
     if (state.video.seed) sp.set('seed', String(state.video.seed))
@@ -240,12 +240,12 @@ export const normalizeUrlStateFromStore = (store, tagsByName) => {
 
   return {
     view: store.viewMode === 'jav' ? 'jav' : 'video',
+    directoryId: store.selectedDirectoryId || null,
     video: {
       page: store.randomMode ? 1 : store.page,
       search: (store.searchTerm || '').trim(),
       tempSort: store.randomMode ? '' : store.videoTempSort || '',
       tagIds: selectedIds,
-      directoryId: store.selectedDirectoryId || null,
       random: store.randomMode,
       seed: store.randomMode ? store.randomSeed : null,
     },

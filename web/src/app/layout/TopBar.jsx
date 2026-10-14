@@ -17,11 +17,12 @@ import {
   normalizeIdolProfileFilters,
 } from '@/constants/jav'
 import { zh } from '@/utils/i18n'
+import DirectoryFilter from '@/features/directories/components/DirectoryFilter'
 
 function isModifiedClick(event) {
   return Boolean(
     event &&
-      (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
+    (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
   )
 }
 
@@ -403,6 +404,10 @@ export default function TopBar({
   searchInput,
   selectedCount = 0,
   selectedFavoriteGroupId = null,
+  directories = [],
+  selectedDirectoryId = null,
+  onDirectoryChange,
+  useHostPaths = false,
 }) {
   const headerRef = useRef(null)
   const favoriteMenuRef = useRef(null)
@@ -581,6 +586,13 @@ export default function TopBar({
               </Button>
             </form>
           ) : null}
+
+          <DirectoryFilter
+            directories={directories}
+            selectedDirectoryId={selectedDirectoryId}
+            onChange={onDirectoryChange}
+            useHostPaths={useHostPaths}
+          />
 
           {isJavMode && javTab === 'list' ? (
             <FavoriteRatingFilter

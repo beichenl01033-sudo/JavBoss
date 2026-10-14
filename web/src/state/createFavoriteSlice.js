@@ -112,7 +112,8 @@ export function createFavoriteSlice({ set, get }) {
     },
     loadJavFavoriteGroups: async (entityType = 'idol', options = {}) => {
       const type = ['jav', 'idol', 'studio', 'series'].includes(entityType) ? entityType : 'idol'
-      const key = `${type}-favorite-groups`
+      const { selectedDirectoryId } = get()
+      const key = `${type}-favorite-groups|${selectedDirectoryId || 'all'}`
       if (!options.force && key === lastFavoriteGroupFetchKeys[type]) {
         return get().favoriteGroupsByType?.[type] || []
       }
@@ -122,7 +123,7 @@ export function createFavoriteSlice({ set, get }) {
         favoriteGroupsErrorByType: { ...(state.favoriteGroupsErrorByType || {}), [type]: null },
       }))
       try {
-        const groups = await fetchJavFavoriteGroups(type)
+        const groups = await fetchJavFavoriteGroups(type, { directoryId: selectedDirectoryId })
         set((state) => ({
           favoriteGroupsByType: { ...(state.favoriteGroupsByType || {}), [type]: groups || [] },
         }))

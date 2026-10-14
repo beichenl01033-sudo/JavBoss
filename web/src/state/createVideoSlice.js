@@ -1,4 +1,10 @@
-import { VIDEO_PAGE_SIZE, videoSelectionKey, normalizeSeed, generateSeed } from '@/state/model'
+import {
+  VIDEO_PAGE_SIZE,
+  videoSelectionKey,
+  normalizeSeed,
+  generateSeed,
+  directoryScopeResetState,
+} from '@/state/model'
 import { normalizeVideoSort } from '@/constants/video'
 import { videoQueryKey } from '@/query/listQueries'
 
@@ -87,7 +93,9 @@ export function createVideoSlice({ set, get, lists }) {
     setSelectedDirectoryId: (id) => {
       const parsed = Number(id)
       const selectedDirectoryId = Number.isFinite(parsed) && parsed > 0 ? parsed : null
-      set({ selectedDirectoryId, page: 1 })
+      get().invalidateTagRequests()
+      get().invalidateFavoriteRequests()
+      set({ selectedDirectoryId, ...directoryScopeResetState() })
     },
     toggleTagFilter: (tagName) => {
       const { selectedTags } = get()
@@ -95,8 +103,7 @@ export function createVideoSlice({ set, get, lists }) {
       const next = exists ? selectedTags.filter((t) => t !== tagName) : [...selectedTags, tagName]
       set({ selectedTags: next, videoTempSort: '', page: 1 })
     },
-    clearFilters: () =>
-      set({ selectedTags: [], selectedDirectoryId: null, videoTempSort: '', page: 1 }),
+    clearFilters: () => set({ selectedTags: [], videoTempSort: '', page: 1 }),
     toggleSelectVideo: (video) => {
       const key = videoSelectionKey(video)
       if (!video || !video.id || !key) return

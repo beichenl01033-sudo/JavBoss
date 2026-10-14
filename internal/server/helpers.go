@@ -1,11 +1,25 @@
 package server
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+func queryDirectoryIDs(c *gin.Context) ([]int64, bool) {
+	raw := strings.TrimSpace(c.Query("directory_id"))
+	if raw == "" {
+		return nil, true
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		respondLocalizedError(c, http.StatusBadRequest, "目录 ID 无效", "Invalid directory ID")
+		return nil, false
+	}
+	return []int64{id}, true
+}
 
 func queryInt(c *gin.Context, key string, def int) int {
 	value := c.Query(key)

@@ -112,6 +112,18 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
         const idSet = new Set(ids)
         return (storeTags || []).filter((t) => idSet.has(t.id)).map((t) => t.name)
       }
+      const currentState = useStore.getState()
+      const directorySelectionAvailable = (currentState.directories || []).some(
+        (directory) =>
+          !directory.is_delete &&
+          directory.enabled !== false &&
+          Number(directory.id) === Number(parsed.directoryId)
+      )
+      const parsedDirectoryId =
+        parsed.directoryId &&
+        ((currentState.directories || []).length === 0 || directorySelectionAvailable)
+          ? parsed.directoryId
+          : null
       if (parsed.view === 'jav') {
         const { jav } = parsed
         const current = useStore.getState()
@@ -122,6 +134,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
           Number(current.idolFavoriteGroupId || 0) === Number(jav.favoriteGroupId || 0)
         useStore.setState({
           viewMode: 'jav',
+          selectedDirectoryId: parsedDirectoryId,
           videoTempSort: '',
           javTab: jav.tab,
           javRandomMode: jav.tab === 'list' ? jav.random : false,
@@ -168,18 +181,6 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       }
 
       const { video } = parsed
-      const current = useStore.getState()
-      const directorySelectionAvailable = (current.directories || []).some(
-        (directory) =>
-          !directory.is_delete &&
-          directory.enabled !== false &&
-          Number(directory.id) === Number(video.directoryId)
-      )
-      const selectedDirectoryId =
-        video.directoryId &&
-        ((current.directories || []).length === 0 || directorySelectionAvailable)
-          ? video.directoryId
-          : null
       useStore.setState({
         viewMode: 'video',
         javTempSort: '',
@@ -188,7 +189,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
         randomMode: video.random,
         randomSeed: video.random ? video.seed : null,
         searchTerm: video.search,
-        selectedDirectoryId,
+        selectedDirectoryId: parsedDirectoryId,
         page: video.random ? 1 : video.page,
       })
       setSearchInput(video.search)

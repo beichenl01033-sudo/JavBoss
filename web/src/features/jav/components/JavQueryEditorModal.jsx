@@ -97,6 +97,7 @@ export default function JavQueryEditorModal({
   favoriteRatingEnabled = false,
   favoriteRatingMin = 0.5,
   favoriteRatingMax = 5,
+  directoryId = null,
 }) {
   const prefixInputRef = useRef(null)
   const idolInputRef = useRef(null)
@@ -223,6 +224,7 @@ export default function JavQueryEditorModal({
         tagSearch,
         studioSearch,
         seriesSearch,
+        directoryId,
         signal: controller.signal,
       })
         .then((payload) => {
@@ -273,6 +275,7 @@ export default function JavQueryEditorModal({
     selectedStudio?.id,
     selectedTagIds,
     seriesSearch,
+    directoryId,
     studioSearch,
     tagSearch,
   ])

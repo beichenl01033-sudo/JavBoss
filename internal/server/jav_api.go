@@ -99,6 +99,10 @@ func searchJav(c *gin.Context) {
 	if !ok {
 		return
 	}
+	directoryIDs, ok := queryDirectoryIDs(c)
+	if !ok {
+		return
+	}
 	sort := strings.TrimSpace(c.Query("sort"))
 	seedParam := strings.TrimSpace(c.Query("seed"))
 	var seed *int64
@@ -111,7 +115,7 @@ func searchJav(c *gin.Context) {
 		seed = &parsed
 	}
 
-	items, total, err := dbpkg.SearchJavWithPrefixFilters(c.Request.Context(), filterQuery.IdolIDs, filterQuery.TagIDs, filterQuery.Search, filterQuery.Prefix, sort, limit, offset, seed, nil, dbpkg.JavSearchFilters{
+	items, total, err := dbpkg.SearchJavWithPrefixFilters(c.Request.Context(), filterQuery.IdolIDs, filterQuery.TagIDs, filterQuery.Search, filterQuery.Prefix, sort, limit, offset, seed, directoryIDs, dbpkg.JavSearchFilters{
 		StudioID:          filterQuery.StudioID,
 		SeriesID:          filterQuery.SeriesID,
 		SoloOnly:          filterQuery.SoloOnly,
@@ -135,13 +139,17 @@ func listJavFilterOptions(c *gin.Context) {
 	if !ok {
 		return
 	}
+	directoryIDs, ok := queryDirectoryIDs(c)
+	if !ok {
+		return
+	}
 	options, err := dbpkg.ListJavFilterOptions(
 		c.Request.Context(),
 		filterQuery.IdolIDs,
 		filterQuery.TagIDs,
 		filterQuery.Search,
 		filterQuery.Prefix,
-		nil,
+		directoryIDs,
 		dbpkg.JavSearchFilters{
 			StudioID:          filterQuery.StudioID,
 			SeriesID:          filterQuery.SeriesID,
@@ -168,7 +176,11 @@ func listJavFilterOptions(c *gin.Context) {
 }
 
 func listJavPrefixes(c *gin.Context) {
-	items, err := dbpkg.ListJavPrefixes(c.Request.Context(), nil)
+	directoryIDs, ok := queryDirectoryIDs(c)
+	if !ok {
+		return
+	}
+	items, err := dbpkg.ListJavPrefixes(c.Request.Context(), directoryIDs)
 	if err != nil {
 		logging.Error("list jav prefixes error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载 JAV 番号前缀失败", "Failed to load JAV code prefixes")
@@ -429,7 +441,11 @@ func javSampleImagesToModel(info *jav.JavInfo) models.JavSampleImages {
 }
 
 func listJavTags(c *gin.Context) {
-	tags, err := dbpkg.ListJavTags(c.Request.Context(), nil)
+	directoryIDs, ok := queryDirectoryIDs(c)
+	if !ok {
+		return
+	}
+	tags, err := dbpkg.ListJavTags(c.Request.Context(), directoryIDs)
 	if err != nil {
 		logging.Error("list jav tags error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载 JAV 标签失败", "Failed to load JAV tags")

@@ -19,6 +19,16 @@ test('query keys include every effective filter and directory visibility', async
     queries.videoQueryKey(state),
     queries.videoQueryKey({ ...state, selectedDirectoryId: 7 })
   )
+  const scopedState = { ...state, selectedDirectoryId: 7 }
+  for (const query of [
+    queries.videoQuery,
+    queries.javQuery,
+    queries.idolQuery,
+    queries.studioQuery,
+    queries.seriesQuery,
+  ]) {
+    assert.equal(query(scopedState).directoryId, 7)
+  }
   assert.notEqual(
     queries.javQueryKey(state),
     queries.javQueryKey({ ...state, javFavoriteRatingEnabled: true, javFavoriteRatingMin: 3 })
