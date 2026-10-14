@@ -12,7 +12,7 @@ export function buildVideoQueryLink(state, options = {}, pathname = '/') {
   for (const key of ['page', 'search', 'random', 'seed', 'tagIds']) {
     if (options[key] != null) video[key] = options[key]
   }
-  if (has(options, 'directoryId')) video.directoryId = options.directoryId
+  if (has(options, 'directoryId')) current.directoryId = options.directoryId
   video.search = String(video.search || '').trim()
   if (has(options, 'tempSort')) video.tempSort = normalizeVideoSort(options.tempSort, '')
   return buildUrlFromState({ ...current, view: 'video', video }, pathname)
@@ -22,6 +22,7 @@ export function buildJavQueryLink(state, options = {}, pathname = '/') {
   const tab = options.tab ?? state.javTab
   const current = normalizeUrlStateFromStore({ ...state, javTab: tab }, new Map())
   const jav = { ...current.jav }
+  if (has(options, 'directoryId')) current.directoryId = options.directoryId
   // Preserve explicit nulls for clearing relations and favorites.
   for (const key of ['studioId', 'seriesId', 'favoriteGroupId']) {
     if (has(options, key)) jav[key] = options[key]

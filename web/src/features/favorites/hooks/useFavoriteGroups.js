@@ -38,6 +38,7 @@ export default function useFavoriteGroups({
     favoriteGroupsByType,
     favoriteGroupsLoadingByType,
     favoriteGroupsErrorByType,
+    selectedDirectoryId,
   } = useStore(
     useShallow((state) => ({
       loadJavFavoriteGroups: state.loadJavFavoriteGroups,
@@ -57,6 +58,7 @@ export default function useFavoriteGroups({
       favoriteGroupsByType: state.favoriteGroupsByType,
       favoriteGroupsLoadingByType: state.favoriteGroupsLoadingByType,
       favoriteGroupsErrorByType: state.favoriteGroupsErrorByType,
+      selectedDirectoryId: state.selectedDirectoryId,
     }))
   )
   const [idolFavoriteModalOpen, setIdolFavoriteModalOpen] = useState(false)
@@ -342,9 +344,9 @@ export default function useFavoriteGroups({
   const handleLoadIdolFavoriteGroupIdols = useCallback(
     (groupId) => {
       const type = favoriteManageEntityType || 'idol'
-      return fetchJavFavoriteGroupItems(type, groupId)
+      return fetchJavFavoriteGroupItems(type, groupId, { directoryId: selectedDirectoryId })
     },
-    [favoriteManageEntityType]
+    [favoriteManageEntityType, selectedDirectoryId]
   )
 
   const handleReorderIdolFavoriteGroupIdols = useCallback(

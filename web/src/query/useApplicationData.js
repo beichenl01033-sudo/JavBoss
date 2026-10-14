@@ -5,26 +5,36 @@ import useWatchedTimeSync from '@/query/useWatchedTimeSync'
 
 export default function useApplicationData() {
   useWatchedTimeSync()
-  const { directories, loadConfig, loadDirectories, loadTags, loadJavTags, videoHideJav } =
-    useStore(
-      useShallow((state) => ({
-        directories: state.directories,
-        loadConfig: state.loadConfig,
-        loadDirectories: state.loadDirectories,
-        loadTags: state.loadTags,
-        loadJavTags: state.loadJavTags,
-        videoHideJav: state.videoHideJav,
-      }))
-    )
+  const {
+    directories,
+    selectedDirectoryId,
+    loadConfig,
+    loadDirectories,
+    loadTags,
+    loadJavTags,
+    videoHideJav,
+  } = useStore(
+    useShallow((state) => ({
+      directories: state.directories,
+      selectedDirectoryId: state.selectedDirectoryId,
+      loadConfig: state.loadConfig,
+      loadDirectories: state.loadDirectories,
+      loadTags: state.loadTags,
+      loadJavTags: state.loadJavTags,
+      videoHideJav: state.videoHideJav,
+    }))
+  )
   const [configLoaded, setConfigLoaded] = useState(false)
 
   const directoryStateKey = useMemo(
     () =>
-      directories
-        .filter((directory) => !directory?.is_delete)
-        .map((directory) => `${directory.id}:${directory.enabled !== false ? '1' : '0'}`)
-        .join(','),
-    [directories]
+      [
+        `selected:${selectedDirectoryId || 0}`,
+        ...directories
+          .filter((directory) => !directory?.is_delete)
+          .map((directory) => `${directory.id}:${directory.enabled !== false ? '1' : '0'}`),
+      ].join(','),
+    [directories, selectedDirectoryId]
   )
 
   useEffect(() => {

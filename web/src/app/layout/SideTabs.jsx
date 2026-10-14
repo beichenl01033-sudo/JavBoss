@@ -58,6 +58,7 @@ export default function SideTabs({
   canGoForward,
   isJavMode,
   javPrefix = '',
+  directoryId = null,
   buildJavPrefixUrl,
   onBrowserBack,
   onBrowserForward,
@@ -81,7 +82,7 @@ export default function SideTabs({
     let cancelled = false
     setPrefixLoading(true)
     setPrefixError('')
-    fetchJavPrefixes()
+    fetchJavPrefixes({ directoryId })
       .then((items) => {
         if (!cancelled) setPrefixItems(Array.isArray(items) ? items : [])
       })
@@ -94,7 +95,7 @@ export default function SideTabs({
     return () => {
       cancelled = true
     }
-  }, [prefixModalOpen])
+  }, [directoryId, prefixModalOpen])
 
   return (
     <aside className="side-tabs" aria-label={zh('主导航', 'Primary navigation')}>

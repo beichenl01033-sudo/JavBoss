@@ -322,6 +322,48 @@ body.has-page-scroll .sticky-pagination {
   color: #1d4ed8;
 }
 
+.directory-filter {
+  display: inline-flex;
+  height: 34px;
+  min-width: 0;
+  max-width: min(20rem, 28vw);
+  flex: 0 1 16rem;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #dbe3ec;
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 8px;
+  color: #64748b;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.directory-filter:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px #dbeafe;
+}
+
+.directory-filter__icon {
+  flex-shrink: 0;
+}
+
+.directory-filter__select {
+  min-width: 0;
+  width: 100%;
+  appearance: auto;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+
+.directory-filter__select:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .favorite-menu-trigger {
   gap: 6px;
   border-radius: 999px;

@@ -69,7 +69,6 @@ export default function useSectionNavigation({
         randomMode: false,
         randomSeed: null,
         selectedTags: [],
-        selectedDirectoryId: null,
         searchTerm: '',
         page: 1,
       })

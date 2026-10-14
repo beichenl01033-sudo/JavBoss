@@ -12,7 +12,6 @@ import {
 } from '@/constants/jav'
 import { zh } from '@/utils/i18n'
 import { getIdolDisplayName } from '@/utils/javIdol'
-import { displayHostPath, hostPathsEnabled } from '@/utils/hostPath'
 
 export default function useLibraryFilters({
   saveScrollBeforeUrlStateChange,
@@ -30,8 +29,6 @@ export default function useLibraryFilters({
     setSearchTerm,
     setSelectedTags,
     searchTerm,
-    selectedDirectoryId,
-    directories,
     javSearchTerm,
     javTagOptions,
     config,
@@ -58,8 +55,6 @@ export default function useLibraryFilters({
       setSearchTerm: state.setSearchTerm,
       setSelectedTags: state.setSelectedTags,
       searchTerm: state.searchTerm,
-      selectedDirectoryId: state.selectedDirectoryId,
-      directories: state.directories,
       javSearchTerm: state.javSearchTerm,
       javTagOptions: state.javTagOptions,
       config: state.config,
@@ -324,17 +319,6 @@ export default function useLibraryFilters({
             updateVideoFilters({ selectedTags: selectedTags.filter((tag) => tag !== name) }),
         })
       })
-      const selectedDirectory = (directories || []).find(
-        (directory) => Number(directory.id) === Number(selectedDirectoryId)
-      )
-      if (selectedDirectory) {
-        const path = displayHostPath(selectedDirectory.path, hostPathsEnabled(config))
-        items.push({
-          key: 'video-directory',
-          label: zh(`目录: ${path}`, `Directory: ${path}`),
-          onRemove: () => updateVideoFilters({ selectedDirectoryId: null }),
-        })
-      }
       if (randomMode) {
         items.push({
           key: 'video-random',
@@ -464,8 +448,6 @@ export default function useLibraryFilters({
     javTags,
     randomMode,
     searchTerm,
-    selectedDirectoryId,
-    directories,
     selectedTags,
     setJavSearchInput,
     setSearchInput,
@@ -478,7 +460,6 @@ export default function useLibraryFilters({
       setSearchInput('')
       updateVideoFilters({
         selectedTags: [],
-        selectedDirectoryId: null,
         searchTerm: '',
         randomMode: false,
         randomSeed: null,

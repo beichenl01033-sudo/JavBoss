@@ -39,6 +39,7 @@ export function javQuery(state) {
     favoriteGroupId: state.javFavoriteGroupId,
     sort: resolveJavSort(state).sort,
     seed: state.javRandomMode ? state.javRandomSeed : null,
+    directoryId: state.selectedDirectoryId,
   }
 }
 
@@ -50,6 +51,7 @@ export function idolQuery(state) {
     sort: state.idolTempSort || (state.idolFavoriteGroupId ? '' : state.idolSort),
     favoriteGroupId: state.idolFavoriteGroupId,
     profileFilters: normalizeIdolProfileFilters(state.idolProfileFilters),
+    directoryId: state.selectedDirectoryId,
   }
 }
 
@@ -58,12 +60,14 @@ export const studioQuery = (state) => ({
   offset: (state.studioPage - 1) * state.studioPageSize,
   search: state.javSearchTerm || '',
   favoriteGroupId: state.studioFavoriteGroupId,
+  directoryId: state.selectedDirectoryId,
 })
 export const seriesQuery = (state) => ({
   limit: state.seriesPageSize,
   offset: (state.seriesPage - 1) * state.seriesPageSize,
   search: state.javSearchTerm || '',
   favoriteGroupId: state.seriesFavoriteGroupId,
+  directoryId: state.selectedDirectoryId,
 })
 
 export const listQueryKey = (query, state) =>

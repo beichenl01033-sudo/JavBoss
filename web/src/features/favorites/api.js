@@ -11,9 +11,12 @@ export function javFavoriteEntityRoute(entityType = 'idol') {
   return JAV_FAVORITE_ENTITY_ROUTES[String(entityType || '').trim()] || 'idol'
 }
 
-export async function fetchJavFavoriteGroups(entityType = 'idol') {
+export async function fetchJavFavoriteGroups(entityType = 'idol', { directoryId = null } = {}) {
   const route = javFavoriteEntityRoute(entityType)
-  const res = await apiFetch(`/jav/${route}-favorite-groups`)
+  const params = new URLSearchParams()
+  if (directoryId) params.set('directory_id', String(directoryId))
+  const query = params.toString()
+  const res = await apiFetch(`/jav/${route}-favorite-groups${query ? `?${query}` : ''}`)
   if (!res.ok) {
     throw await apiError(res)
   }
@@ -68,9 +71,18 @@ export async function reorderJavFavoriteGroups(entityType = 'idol', groupIds = [
   }
 }
 
-export async function fetchJavFavoriteGroupItems(entityType = 'idol', id) {
+export async function fetchJavFavoriteGroupItems(
+  entityType = 'idol',
+  id,
+  { directoryId = null } = {}
+) {
   const route = javFavoriteEntityRoute(entityType)
-  const res = await apiFetch(`/jav/${route}-favorite-groups/${encodeURIComponent(id)}/items`)
+  const params = new URLSearchParams()
+  if (directoryId) params.set('directory_id', String(directoryId))
+  const query = params.toString()
+  const res = await apiFetch(
+    `/jav/${route}-favorite-groups/${encodeURIComponent(id)}/items${query ? `?${query}` : ''}`
+  )
   if (!res.ok) {
     throw await apiError(res)
   }

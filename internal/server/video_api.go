@@ -32,15 +32,9 @@ func listVideos(c *gin.Context) {
 	limit := queryInt(c, "limit", 100)
 	offset := queryInt(c, "offset", 0)
 	tagFilter := parseTagQuery(c.Query("tags"))
-	directoryParam := strings.TrimSpace(c.Query("directory_id"))
-	var directoryIDs []int64
-	if directoryParam != "" {
-		directoryID, err := strconv.ParseInt(directoryParam, 10, 64)
-		if err != nil || directoryID <= 0 {
-			respondLocalizedError(c, http.StatusBadRequest, "目录 ID 无效", "Invalid directory ID")
-			return
-		}
-		directoryIDs = []int64{directoryID}
+	directoryIDs, ok := queryDirectoryIDs(c)
+	if !ok {
+		return
 	}
 	search := strings.TrimSpace(c.Query("search"))
 	sort := strings.TrimSpace(c.Query("sort"))

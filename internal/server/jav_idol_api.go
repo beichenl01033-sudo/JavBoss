@@ -37,8 +37,12 @@ func listJavIdols(c *gin.Context) {
 	if !ok {
 		return
 	}
+	directoryIDs, ok := queryDirectoryIDs(c)
+	if !ok {
+		return
+	}
 
-	items, total, err := dbpkg.ListJavIdols(c.Request.Context(), search, sort, limit, offset, nil, favoriteGroupID, filters)
+	items, total, err := dbpkg.ListJavIdols(c.Request.Context(), search, sort, limit, offset, directoryIDs, favoriteGroupID, filters)
 	if err != nil {
 		logging.Error("list jav idols: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载女优列表失败", "Failed to load idols")

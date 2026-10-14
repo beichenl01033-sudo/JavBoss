@@ -72,6 +72,7 @@ export async function fetchJavs({
   sort = '',
   seed = null,
   favoriteGroupId = null,
+  directoryId = null,
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -91,6 +92,7 @@ export async function fetchJavs({
   if (sort) params.set('sort', sort)
   if (seed != null) params.set('seed', String(seed))
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
+  if (directoryId) params.set('directory_id', String(directoryId))
   const res = await apiFetch(`/jav?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -116,6 +118,7 @@ export async function fetchJavFilterOptions({
   studioSearch = '',
   seriesSearch = '',
   optionLimit = 120,
+  directoryId = null,
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -137,6 +140,7 @@ export async function fetchJavFilterOptions({
   if (studioSearch) params.set('studio_search', studioSearch)
   if (seriesSearch) params.set('series_search', seriesSearch)
   params.set('option_limit', String(optionLimit))
+  if (directoryId) params.set('directory_id', String(directoryId))
   const res = await apiFetch(`/jav/filter-options?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -185,16 +189,22 @@ export function resolveJavSampleImages(id) {
   return request
 }
 
-export async function fetchJavPrefixes() {
-  const res = await apiFetch('/jav/prefixes')
+export async function fetchJavPrefixes({ directoryId = null } = {}) {
+  const params = new URLSearchParams()
+  if (directoryId) params.set('directory_id', String(directoryId))
+  const query = params.toString()
+  const res = await apiFetch(`/jav/prefixes${query ? `?${query}` : ''}`)
   if (!res.ok) {
     throw await apiError(res)
   }
   return res.json()
 }
 
-export async function fetchJavTags() {
-  const res = await apiFetch('/jav/tags')
+export async function fetchJavTags({ directoryId = null } = {}) {
+  const params = new URLSearchParams()
+  if (directoryId) params.set('directory_id', String(directoryId))
+  const query = params.toString()
+  const res = await apiFetch(`/jav/tags${query ? `?${query}` : ''}`)
   if (!res.ok) {
     throw await apiError(res)
   }
@@ -392,6 +402,7 @@ export async function fetchJavIdols({
   sort = '',
   favoriteGroupId = null,
   profileFilters = {},
+  directoryId = null,
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -400,6 +411,7 @@ export async function fetchJavIdols({
   if (search) params.set('search', search)
   if (sort) params.set('sort', sort)
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
+  if (directoryId) params.set('directory_id', String(directoryId))
   for (const key of ['height', 'age', 'cup', 'bust', 'waist', 'hips']) {
     const value = profileFilters?.[key]
     if (!value?.enabled) continue
@@ -490,6 +502,7 @@ export async function fetchJavStudios({
   offset = 0,
   search = '',
   favoriteGroupId = null,
+  directoryId = null,
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -497,6 +510,7 @@ export async function fetchJavStudios({
   params.set('offset', String(offset))
   if (search) params.set('search', search)
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
+  if (directoryId) params.set('directory_id', String(directoryId))
   const res = await apiFetch(`/jav/studios?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -567,6 +581,7 @@ export async function fetchJavSeries({
   offset = 0,
   search = '',
   favoriteGroupId = null,
+  directoryId = null,
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -574,6 +589,7 @@ export async function fetchJavSeries({
   params.set('offset', String(offset))
   if (search) params.set('search', search)
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
+  if (directoryId) params.set('directory_id', String(directoryId))
   const res = await apiFetch(`/jav/series?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
