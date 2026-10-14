@@ -97,6 +97,57 @@ func TestListVideosSortByDurationDirections(t *testing.T) {
 	}
 }
 
+func TestListVideosSortByModifiedTimeDirections(t *testing.T) {
+	database := openTestDB(t)
+	ctx := context.Background()
+	now := time.Unix(1710000000, 0).UTC()
+
+	dir := models.Directory{Path: "/tmp/modified-media"}
+	if err := database.Create(&dir).Error; err != nil {
+		t.Fatalf("create directory: %v", err)
+	}
+
+	oldFile := models.Video{
+		DirectoryID: dir.ID,
+		Path:        "old-file.mp4",
+		Filename:    "old-file.mp4",
+		Fingerprint: "video-modified-old",
+		ModifiedAt:  now.Add(-24 * time.Hour),
+		CreatedAt:   now.Add(time.Hour),
+	}
+	newFile := models.Video{
+		DirectoryID: dir.ID,
+		Path:        "new-file.mp4",
+		Filename:    "new-file.mp4",
+		Fingerprint: "video-modified-new",
+		ModifiedAt:  now,
+		CreatedAt:   now,
+	}
+	if err := database.Create(&oldFile).Error; err != nil {
+		t.Fatalf("create old file video: %v", err)
+	}
+	if err := database.Create(&newFile).Error; err != nil {
+		t.Fatalf("create new file video: %v", err)
+	}
+	createVideoLocationsForVideos(t, database, oldFile, newFile)
+
+	items, err := ListVideos(ctx, 20, 0, nil, "", "modified", nil, nil)
+	if err != nil {
+		t.Fatalf("ListVideos modified: %v", err)
+	}
+	if len(items) != 2 || items[0].ID != newFile.ID {
+		t.Fatalf("unexpected modified order: %#v", items)
+	}
+
+	items, err = ListVideos(ctx, 20, 0, nil, "", "modified_asc", nil, nil)
+	if err != nil {
+		t.Fatalf("ListVideos modified_asc: %v", err)
+	}
+	if len(items) != 2 || items[0].ID != oldFile.ID {
+		t.Fatalf("unexpected modified_asc order: %#v", items)
+	}
+}
+
 func TestListVideosCanHideRecognizedJav(t *testing.T) {
 	gdb := openTestDB(t)
 	ctx := context.Background()

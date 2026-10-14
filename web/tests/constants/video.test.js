@@ -40,3 +40,20 @@ test('saved video sort preferences and links retain direction when normalized', 
     assert.equal(normalizeVideoSort(input), expected)
   }
 })
+
+test('video file modified time sorting supports both directions', () => {
+  const option = findVideoSortOption('modified')
+  assert.ok(option)
+  assert.equal(findVideoSortOption('modified_asc'), option)
+  assert.equal(normalizeVideoSort('modified_desc'), 'modified')
+  assert.equal(reverseVideoSortValue('modified'), 'modified_asc')
+  assert.equal(reverseVideoSortValue('modified_asc'), 'modified')
+  assert.deepEqual(
+    videoSortLabelParts(option, 'modified', (cn) => cn),
+    {
+      label: '文件修改时间',
+      separator: '：',
+      direction: '近→远',
+    }
+  )
+})

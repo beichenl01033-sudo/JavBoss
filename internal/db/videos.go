@@ -37,6 +37,10 @@ func ListVideos(ctx context.Context, limit, offset int, tagNames []string, searc
 		orderClause = "video_location.filename COLLATE NOCASE, video_location.id"
 	case "filename_desc":
 		orderClause = "video_location.filename COLLATE NOCASE DESC, video_location.id DESC"
+	case "modified", "modified_desc":
+		orderClause = "video_location.modified_at DESC, video_location.id DESC"
+	case "modified_asc":
+		orderClause = "video_location.modified_at ASC, video_location.id ASC"
 	case "duration", "duration_desc":
 		orderClause = "video.duration_sec DESC, video.created_at DESC, video_location.id DESC"
 	case "duration_asc":
