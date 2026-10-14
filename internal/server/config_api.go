@@ -58,7 +58,7 @@ var javSortRuleFilterOrder = map[string]int{
 }
 
 var validJavSortValues = map[string]struct{}{
-	"recent": {}, "recent_asc": {}, "code": {}, "code_desc": {},
+	"recent": {}, "recent_asc": {}, "modified": {}, "modified_asc": {}, "code": {}, "code_desc": {},
 	"duration": {}, "duration_asc": {}, "release": {}, "release_asc": {},
 	"watched": {}, "watched_asc": {}, "favorite_rating": {}, "favorite_rating_asc": {},
 }
@@ -262,8 +262,10 @@ func updateConfig(c *gin.Context) {
 	}
 	if s := strings.ToLower(strings.TrimSpace(req.VideoSort)); s != "" {
 		switch s {
-		case "recent", "recent_asc", "filename", "filename_desc", "duration", "duration_asc", "watched", "watched_asc":
+		case "recent", "recent_asc", "modified", "modified_asc", "filename", "filename_desc", "duration", "duration_asc", "watched", "watched_asc":
 			entries["video_sort"] = s
+		case "modified_desc":
+			entries["video_sort"] = "modified"
 		case "watched_desc", "play_count", "play_count_desc":
 			entries["video_sort"] = "watched"
 		case "play_count_asc":
@@ -294,8 +296,10 @@ func updateConfig(c *gin.Context) {
 	}
 	if s := strings.ToLower(strings.TrimSpace(req.IdolSort)); s != "" {
 		switch s {
-		case "recent", "recent_asc", "work", "work_asc", "birth", "birth_asc", "height", "height_desc", "bust", "bust_asc", "hips", "hips_asc", "waist", "waist_desc", "measurements", "cup", "cup_asc":
+		case "recent", "recent_asc", "modified", "modified_asc", "work", "work_asc", "birth", "birth_asc", "height", "height_desc", "bust", "bust_asc", "hips", "hips_asc", "waist", "waist_desc", "measurements", "cup", "cup_asc":
 			entries["idol_sort"] = s
+		case "modified_desc":
+			entries["idol_sort"] = "modified"
 		default:
 			// ignore invalid values
 		}
@@ -652,6 +656,8 @@ func normalizedPlayerHotkeyAmount(action string, amount float64) float64 {
 
 func normalizeJavSortValue(value string) string {
 	switch s := strings.ToLower(strings.TrimSpace(value)); s {
+	case "modified_desc":
+		return "modified"
 	case "watched_desc", "play_count", "play_count_desc":
 		return "watched"
 	case "play_count_asc":
