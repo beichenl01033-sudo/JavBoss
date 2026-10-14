@@ -28,10 +28,8 @@ jobs:
       matrix:
         platform:
           - windows-x86_64
-          - linux-x86_64
-          - macos-x86_64
           - macos-arm64
-    runs-on: ${{ fromJson('{"windows-x86_64":"ubuntu-latest","linux-x86_64":"ubuntu-latest","macos-x86_64":"macos-15-intel","macos-arm64":"macos-14"}')[matrix.platform] }}
+    runs-on: ${{ fromJson('{"windows-x86_64":"ubuntu-latest","macos-arm64":"macos-14"}')[matrix.platform] }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -53,12 +51,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mingw-w64 zip unzip
-
-      - name: Install build deps (Linux target)
-        if: ${{ matrix.platform == 'linux-x86_64' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zip unzip
 
       - name: Build CLI bundle
         run: |
@@ -147,9 +139,9 @@ jobs:
           fi
 
           mapfile -t assets < <(find release-artifacts -type f -name "*.zip" | sort)
-          expected_assets=4
+          expected_assets=2
           if [[ "$PUBLISH_BROWSER_EXTENSION" == "true" ]]; then
-            expected_assets=5
+            expected_assets=3
           fi
           if [[ "${#assets[@]}" -ne "$expected_assets" ]]; then
             echo "expected $expected_assets release assets, found ${#assets[@]}" >&2
