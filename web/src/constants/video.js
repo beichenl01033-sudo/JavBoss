@@ -9,6 +9,15 @@ export const VIDEO_SORT_OPTIONS = [
     desc: ['近→远', 'new→old'],
   },
   {
+    base: 'modified',
+    defaultValue: 'modified',
+    ascValue: 'modified_asc',
+    descValue: 'modified',
+    label: ['文件修改时间', 'File modified time'],
+    asc: ['远→近', 'old→new'],
+    desc: ['近→远', 'new→old'],
+  },
+  {
     base: 'filename',
     defaultValue: 'filename',
     ascValue: 'filename',
@@ -46,6 +55,7 @@ export function normalizeVideoSort(sort, fallback = 'recent') {
     .trim()
     .toLowerCase()
   if (key === 'recent_desc') return 'recent'
+  if (key === 'modified_desc') return 'modified'
   if (key === 'filename_asc') return 'filename'
   if (key === 'duration_desc') return 'duration'
   // Preserve the direction of saved preferences and links using the old sort.
