@@ -15,6 +15,15 @@ export const JAV_SORT_OPTIONS = [
     desc: ['近→远', 'new→old'],
   },
   {
+    base: 'modified',
+    defaultValue: 'modified',
+    ascValue: 'modified_asc',
+    descValue: 'modified',
+    label: ['文件修改时间', 'File modified time'],
+    asc: ['远→近', 'old→new'],
+    desc: ['近→远', 'new→old'],
+  },
+  {
     base: 'code',
     defaultValue: 'code',
     ascValue: 'code',
@@ -94,6 +103,15 @@ export const IDOL_SORT_OPTIONS = [
     ascValue: 'recent_asc',
     descValue: 'recent',
     label: ['加入时间', 'Added time'],
+    asc: ['远→近', 'old→new'],
+    desc: ['近→远', 'new→old'],
+  },
+  {
+    base: 'modified',
+    defaultValue: 'modified',
+    ascValue: 'modified_asc',
+    descValue: 'modified',
+    label: ['文件修改时间', 'File modified time'],
     asc: ['远→近', 'old→new'],
     desc: ['近→远', 'new→old'],
   },
@@ -232,6 +250,7 @@ const normalizeFromOptions = (sort, fallback, optionsMap, aliases = {}) => {
 export function normalizeJavSort(sort, fallback = 'recent') {
   return normalizeFromOptions(sort, fallback, javSortMap, {
     recent_desc: 'recent',
+    modified_desc: 'modified',
     code_asc: 'code',
     duration_desc: 'duration',
     release_desc: 'release',
@@ -341,6 +360,7 @@ export function normalizeIdolSort(sort, fallback = 'work') {
     measure: 'bust',
     bwh: 'bust',
     recent_desc: 'recent',
+    modified_desc: 'modified',
     added: 'recent',
     created: 'recent',
     created_at: 'recent',

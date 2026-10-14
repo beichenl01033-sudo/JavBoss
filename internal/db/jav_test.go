@@ -1224,6 +1224,57 @@ func TestSearchJavSortByFavoriteRating(t *testing.T) {
 	}
 }
 
+func TestSearchJavSortByLatestFileModifiedTimeAndDirectory(t *testing.T) {
+	database := openTestDB(t)
+	ctx := context.Background()
+	now := time.Unix(1710000000, 0).UTC()
+
+	directories := []models.Directory{{Path: "/tmp/modified-a"}, {Path: "/tmp/modified-b"}}
+	if err := database.Create(&directories).Error; err != nil {
+		t.Fatalf("create directories: %v", err)
+	}
+	javas := []models.Jav{
+		{Code: "MOD-OLD", Title: "Old in directory A", FetchedAt: now, CreatedAt: now.Add(time.Hour)},
+		{Code: "MOD-NEW", Title: "New in directory A", FetchedAt: now, CreatedAt: now},
+	}
+	if err := database.Create(&javas).Error; err != nil {
+		t.Fatalf("create javs: %v", err)
+	}
+	videos := []models.Video{
+		{DirectoryID: directories[0].ID, Path: "old-a.mp4", Filename: "old-a.mp4", Fingerprint: "modified-old-a", JavID: int64Ptr(javas[0].ID), ModifiedAt: now.Add(-48 * time.Hour)},
+		{DirectoryID: directories[1].ID, Path: "old-b.mp4", Filename: "old-b.mp4", Fingerprint: "modified-old-b", JavID: int64Ptr(javas[0].ID), ModifiedAt: now.Add(time.Hour)},
+		{DirectoryID: directories[0].ID, Path: "new-a.mp4", Filename: "new-a.mp4", Fingerprint: "modified-new-a", JavID: int64Ptr(javas[1].ID), ModifiedAt: now},
+	}
+	if err := database.Create(&videos).Error; err != nil {
+		t.Fatalf("create videos: %v", err)
+	}
+	createVideoLocationsForVideos(t, database, videos...)
+
+	items, total, err := SearchJav(ctx, nil, nil, "", "modified", 20, 0, nil, nil)
+	if err != nil {
+		t.Fatalf("SearchJav modified: %v", err)
+	}
+	if total != 2 || len(items) != 2 || items[0].ID != javas[0].ID {
+		t.Fatalf("modified order = %#v total=%d, want latest copy first", items, total)
+	}
+
+	items, total, err = SearchJav(ctx, nil, nil, "", "modified", 20, 0, nil, []int64{directories[0].ID})
+	if err != nil {
+		t.Fatalf("SearchJav modified directory filter: %v", err)
+	}
+	if total != 2 || len(items) != 2 || items[0].ID != javas[1].ID {
+		t.Fatalf("directory-scoped modified order = %#v total=%d, want directory A latest first", items, total)
+	}
+
+	items, total, err = SearchJav(ctx, nil, nil, "", "modified_asc", 20, 0, nil, nil)
+	if err != nil {
+		t.Fatalf("SearchJav modified_asc: %v", err)
+	}
+	if total != 2 || len(items) != 2 || items[0].ID != javas[1].ID {
+		t.Fatalf("modified_asc order = %#v total=%d, want older maximum first", items, total)
+	}
+}
+
 func TestListJavStudiosAndSearchByStudio(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
@@ -3203,6 +3254,64 @@ func TestListJavIdolsSortByRecentDirections(t *testing.T) {
 	}
 	if items[0].ID != oldIdol.ID {
 		t.Fatalf("unexpected recent_asc first idol: got %d want %d", items[0].ID, oldIdol.ID)
+	}
+}
+
+func TestListJavIdolsSortByLatestFileModifiedTime(t *testing.T) {
+	database := openTestDB(t)
+	ctx := context.Background()
+	now := time.Unix(1710000000, 0).UTC()
+
+	dir := models.Directory{Path: "/tmp/idol-modified-media"}
+	if err := database.Create(&dir).Error; err != nil {
+		t.Fatalf("create directory: %v", err)
+	}
+	idols := []models.JavIdol{
+		{Name: "Latest File Idol", CreatedAt: now.Add(-time.Hour)},
+		{Name: "Earlier File Idol", CreatedAt: now},
+	}
+	if err := database.Create(&idols).Error; err != nil {
+		t.Fatalf("create idols: %v", err)
+	}
+	javas := []models.Jav{
+		{Code: "IMOD-001", Title: "Old file", FetchedAt: now},
+		{Code: "IMOD-002", Title: "Latest file", FetchedAt: now},
+		{Code: "IMOD-003", Title: "Earlier maximum", FetchedAt: now},
+	}
+	if err := database.Create(&javas).Error; err != nil {
+		t.Fatalf("create javs: %v", err)
+	}
+	if err := database.Create(&[]models.JavIdolMap{
+		{JavID: javas[0].ID, JavIdolID: idols[0].ID},
+		{JavID: javas[1].ID, JavIdolID: idols[0].ID},
+		{JavID: javas[2].ID, JavIdolID: idols[1].ID},
+	}).Error; err != nil {
+		t.Fatalf("create idol maps: %v", err)
+	}
+	videos := []models.Video{
+		{DirectoryID: dir.ID, Path: "imod-001.mp4", Filename: "imod-001.mp4", Fingerprint: "idol-modified-old", JavID: int64Ptr(javas[0].ID), ModifiedAt: now.Add(-48 * time.Hour)},
+		{DirectoryID: dir.ID, Path: "imod-002.mp4", Filename: "imod-002.mp4", Fingerprint: "idol-modified-latest", JavID: int64Ptr(javas[1].ID), ModifiedAt: now.Add(time.Hour)},
+		{DirectoryID: dir.ID, Path: "imod-003.mp4", Filename: "imod-003.mp4", Fingerprint: "idol-modified-earlier", JavID: int64Ptr(javas[2].ID), ModifiedAt: now},
+	}
+	if err := database.Create(&videos).Error; err != nil {
+		t.Fatalf("create videos: %v", err)
+	}
+	createVideoLocationsForVideos(t, database, videos...)
+
+	items, total, err := ListJavIdols(ctx, "", "modified", 20, 0, nil, 0)
+	if err != nil {
+		t.Fatalf("ListJavIdols modified: %v", err)
+	}
+	if total != 2 || len(items) != 2 || items[0].ID != idols[0].ID {
+		t.Fatalf("modified idol order = %#v total=%d, want latest file idol first", items, total)
+	}
+
+	items, total, err = ListJavIdols(ctx, "", "modified_asc", 20, 0, nil, 0)
+	if err != nil {
+		t.Fatalf("ListJavIdols modified_asc: %v", err)
+	}
+	if total != 2 || len(items) != 2 || items[0].ID != idols[1].ID {
+		t.Fatalf("modified_asc idol order = %#v total=%d, want earlier maximum first", items, total)
 	}
 }
 
