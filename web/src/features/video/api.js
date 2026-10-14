@@ -7,6 +7,7 @@ export async function fetchVideos({
   search = '',
   sort = '',
   seed = null,
+  directoryId = null,
   hideJav = false,
   signal,
 } = {}) {
@@ -17,6 +18,7 @@ export async function fetchVideos({
   if (search) params.set('search', search)
   if (sort) params.set('sort', sort)
   if (seed != null) params.set('seed', String(seed))
+  if (directoryId != null) params.set('directory_id', String(directoryId))
   params.set('hide_jav', hideJav ? '1' : '0')
   const res = await apiFetch(`/videos?${params.toString()}`, { signal })
   if (!res.ok) throw await apiError(res)

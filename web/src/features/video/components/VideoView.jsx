@@ -4,6 +4,7 @@ import { useState } from 'react'
 import BulkPlaybackMenu from '@/features/playback/components/BulkPlaybackMenu'
 import Pagination from '@/shared/ui/Pagination'
 import VideoGrid from '@/features/video/components/VideoGrid'
+import VideoDirectoryFilter from '@/features/video/components/VideoDirectoryFilter'
 import WaterfallLoader from '@/shared/ui/WaterfallLoader'
 import {
   VIDEO_SORT_OPTIONS,
@@ -62,6 +63,10 @@ export default function VideoView({
   onLoadMore,
   loadingMore,
   hasMore,
+  directories,
+  selectedDirectoryId,
+  onDirectoryChange,
+  useHostPaths,
 }) {
   const [sortAnchorEl, setSortAnchorEl] = useState(null)
   const pageIds = videos.map((video) => videoSelectionKey(video)).filter(Boolean)
@@ -104,7 +109,14 @@ export default function VideoView({
     <>
       <div className="sticky-pagination mb-4">
         <div className="pagination-toolbar-grid relative grid md:grid-cols-[1fr_auto_1fr] md:items-center">
-          <div />
+          <div className="mb-2 flex min-w-0 justify-center md:mb-0 md:justify-start">
+            <VideoDirectoryFilter
+              directories={directories}
+              selectedDirectoryId={selectedDirectoryId}
+              onChange={onDirectoryChange}
+              useHostPaths={useHostPaths}
+            />
+          </div>
           <div className="flex justify-center">
             <Pagination
               page={paginationPage}

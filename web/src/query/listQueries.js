@@ -17,6 +17,7 @@ export function videoQuery(state) {
     search: state.searchTerm || '',
     sort: state.randomMode ? 'random' : state.videoTempSort || state.sortOrder,
     seed: state.randomMode ? state.randomSeed : null,
+    directoryId: state.selectedDirectoryId,
     hideJav: state.videoHideJav,
   }
 }
