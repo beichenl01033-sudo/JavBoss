@@ -236,6 +236,54 @@ func TestUpdateConfigPersistsWatchTimeSort(t *testing.T) {
 	}
 }
 
+func TestUpdateConfigPersistsFileModifiedSort(t *testing.T) {
+	testAuthService(t)
+	router := gin.New()
+	router.PATCH("/config", updateConfig)
+	for _, tc := range []struct{ input, want string }{
+		{"modified", "modified"},
+		{"modified_asc", "modified_asc"},
+		{"modified_desc", "modified"},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			body, err := json.Marshal(map[string]any{
+				"video_sort": tc.input,
+				"jav_sort":   tc.input,
+				"jav_sort_rules": javSortRulesConfig{Version: 1, Rules: []javSortRule{
+					{ID: "file-modified", Enabled: true, Mode: "all", Active: []string{"idol"}, Sort: tc.input},
+				}},
+				"idol_sort": tc.input,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest(http.MethodPatch, "/config", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, req)
+			if response.Code != http.StatusOK {
+				t.Fatalf("update config status=%d body=%s", response.Code, response.Body)
+			}
+			cfg, err := dbpkg.ListConfig(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range []string{"video_sort", "jav_sort", "idol_sort"} {
+				if cfg[key] != tc.want {
+					t.Fatalf("%s=%q, want %q", key, cfg[key], tc.want)
+				}
+			}
+			var rules javSortRulesConfig
+			if err := json.Unmarshal([]byte(cfg["jav_sort_rules"]), &rules); err != nil {
+				t.Fatal(err)
+			}
+			if len(rules.Rules) != 1 || rules.Rules[0].Sort != tc.want {
+				t.Fatalf("jav_sort_rules=%+v, want sort %q", rules, tc.want)
+			}
+		})
+	}
+}
+
 func TestUpdateConfigPersistsJavSortRules(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	database, err := dbpkg.Open(filepath.Join(t.TempDir(), "config.db"))
