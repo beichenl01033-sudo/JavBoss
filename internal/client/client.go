@@ -153,6 +153,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.handlePlaylist(w, r)
 	case r.URL.Path == "/videos/open" || r.URL.Path == "/videos/reveal":
 		respondJSONError(w, http.StatusNotImplemented, "Client 模式不支持打开远端文件或所在目录", "Client mode cannot open or reveal a remote file")
+	case r.URL.Path == "/clips":
+		c.handleClipTasks(w, r)
+	case strings.HasPrefix(r.URL.Path, "/clips/"):
+		c.handleClipTaskAction(w, r)
 	case r.URL.Path == "/config":
 		c.handleConfig(w, r)
 	default:

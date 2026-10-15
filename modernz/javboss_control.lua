@@ -5,7 +5,6 @@ local options = require "mp.options"
 local input_ok, input = pcall(require, "mp.input")
 
 local opts = {
-    ffmpeg_path = "",
     duplicate_window = 2,
 }
 options.read_options(opts, "javboss_control")
@@ -15,7 +14,7 @@ local native_chapters = {}
 local highlight_path = nil
 local clip_a = nil
 local clip_b = nil
-local export_running = false
+local clip_request_sequence = 0
 
 local function osd(message, duration)
     mp.osd_message(message, duration or 2.5)
@@ -285,56 +284,7 @@ local function clip_supported()
     return utils.file_info(path) ~= nil
 end
 
-local function next_output_path(path, start_time, end_time)
-    local dir, filename = utils.split_path(path)
-    local extension = filename:match("(%.[^%.]+)$") or ".mkv"
-    local stem = filename:sub(1, #filename - #extension)
-    local suffix = ".javboss-clip-" .. filename_time(start_time) .. "-" .. filename_time(end_time)
-    local candidate = utils.join_path(dir, stem .. suffix .. extension)
-    local sequence = 2
-    while utils.file_info(candidate) do
-        candidate = utils.join_path(dir, stem .. suffix .. string.format("-%02d", sequence) .. extension)
-        sequence = sequence + 1
-    end
-    return candidate, extension
-end
-
-local function powershell_literal(value)
-    return "'" .. tostring(value):gsub("'", "''") .. "'"
-end
-
-local function copy_modified_time(source, output)
-    local args
-    if package.config:sub(1, 1) == "\\" then
-        local source_literal = powershell_literal(source)
-        local output_literal = powershell_literal(output)
-        args = {
-            "powershell.exe",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "$source = Get-Item -LiteralPath " .. source_literal .. "; " ..
-                "$target = Get-Item -LiteralPath " .. output_literal .. "; " ..
-                "$target.LastWriteTimeUtc = $source.LastWriteTimeUtc",
-        }
-    else
-        args = { "touch", "-m", "-r", source, output }
-    end
-
-    local result = utils.subprocess({ args = args, cancellable = false })
-    if not result or result.status ~= 0 then
-        local reason = result and (result.error_string or result.stderr) or "unknown error"
-        mp.msg.error("copy clip modified time failed: " .. tostring(reason))
-        return false
-    end
-    return true
-end
-
 local function export_clip()
-    if export_running then
-        osd("剪辑正在导出")
-        return
-    end
     if not clip_a or not clip_b or clip_b <= clip_a then
         osd("请先选择有效的剪辑区间")
         return
@@ -343,58 +293,17 @@ local function export_clip()
         osd("远程视频暂不支持剪辑")
         return
     end
-    if opts.ffmpeg_path == "" or not utils.file_info(opts.ffmpeg_path) then
-        osd("未找到 FFmpeg，请先在 JavBoss 工具页面下载")
-        return
-    end
-
     local source = mp.get_property("path")
-    local output, extension = next_output_path(source, clip_a, clip_b)
-    local temp = output .. ".part" .. extension
-    os.remove(temp)
-    export_running = true
-    osd("正在无损导出剪辑…", 4)
-    mp.command_native_async({
-        name = "subprocess",
-        playback_only = false,
-        capture_stdout = true,
-        capture_stderr = true,
-        args = {
-            opts.ffmpeg_path,
-            "-hide_banner", "-loglevel", "error",
-            "-ss", tostring(clip_a),
-            "-i", source,
-            "-t", tostring(clip_b - clip_a),
-            "-map", "0",
-            "-c", "copy",
-            "-avoid_negative_ts", "make_zero",
-            "-y", temp,
-        },
-    }, function(success, result, error_message)
-        export_running = false
-        if not success or not result or result.status ~= 0 then
-            os.remove(temp)
-            mp.msg.error("clip export failed: " .. tostring(error_message or (result and result.stderr)))
-            osd("剪辑导出失败")
-            return
-        end
-        -- Apply the timestamp before the final atomic rename. Directory scans can
-        -- never observe the completed filename with FFmpeg's current timestamp.
-        local timestamp_copied = copy_modified_time(source, temp)
-        local renamed, rename_error = os.rename(temp, output)
-        if not renamed then
-            os.remove(temp)
-            mp.msg.error("rename clip output failed: " .. tostring(rename_error))
-            osd("剪辑文件保存失败")
-            return
-        end
-        clear_clip(false)
-        if timestamp_copied then
-            osd("剪辑已保存：" .. select(2, utils.split_path(output)), 5)
-        else
-            osd("剪辑已保存，但未能同步源文件修改时间", 5)
-        end
-    end)
+    clip_request_sequence = clip_request_sequence + 1
+    local payload = utils.format_json({
+        request_id = tostring(os.time()) .. "-" .. tostring(clip_request_sequence),
+        source = source,
+        start_seconds = clip_a,
+        end_seconds = clip_b,
+    })
+    mp.set_property("user-data/javboss/clip-request", payload)
+    clear_clip(false)
+    osd("剪辑任务已提交到 JavBoss，可关闭播放器", 5)
 end
 
 local function clip_menu()

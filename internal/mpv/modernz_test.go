@@ -189,7 +189,7 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 	}
 }
 
-func TestBundledJavBossControlSupportsHighlightsAndLosslessClips(t *testing.T) {
+func TestBundledJavBossControlSupportsHighlightsAndBackgroundClips(t *testing.T) {
 	sourceDir, err := findModernZSourceDir()
 	if err != nil {
 		t.Fatalf("find ModernZ source dir: %v", err)
@@ -204,24 +204,16 @@ func TestBundledJavBossControlSupportsHighlightsAndLosslessClips(t *testing.T) {
 		`mp.register_script_message("manage-highlights", manage_highlights)`,
 		`mp.register_script_message("clip-click", clip_click)`,
 		`utils.join_path(video_dir, "highlights.json")`,
-		`".javboss-clip-"`,
-		`"-c", "copy"`,
-		`args = { "touch", "-m", "-r", source, output }`,
-		`return "'" .. tostring(value):gsub("'", "''") .. "'"`,
-		`"$target.LastWriteTimeUtc = $source.LastWriteTimeUtc"`,
-		`local timestamp_copied = copy_modified_time(source, temp)`,
+		`mp.set_property("user-data/javboss/clip-request", payload)`,
+		`start_seconds = clip_a`,
+		`end_seconds = clip_b`,
+		`剪辑任务已提交到 JavBoss，可关闭播放器`,
 		`prompt = "确认删除 "`,
 	} {
 		if !strings.Contains(string(control), expected) {
 			t.Fatalf("expected JavBoss control script to contain %q", expected)
 		}
 	}
-	timestampCheck := strings.Index(string(control), `local timestamp_copied = copy_modified_time(source, temp)`)
-	renameCheck := strings.Index(string(control), `local renamed, rename_error = os.rename(temp, output)`)
-	if timestampCheck < 0 || renameCheck < 0 || timestampCheck >= renameCheck {
-		t.Fatal("expected clip timestamp synchronization before the final rename")
-	}
-
 	modernZ, err := os.ReadFile(filepath.Join(sourceDir, "modernz.lua"))
 	if err != nil {
 		t.Fatalf("read ModernZ script: %v", err)

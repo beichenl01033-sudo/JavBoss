@@ -33,7 +33,9 @@ type playerProcessManager struct {
 // windows and playlists. No new players can start once shutdown begins.
 func Shutdown() {
 	playerProcesses.close(playerShutdownTimeout)
+	independentEventWatchers.Wait()
 	playlistWatchers.Wait()
+	defaultClipTasks.shutdown()
 }
 
 func (m *playerProcessManager) start(cmd *exec.Cmd, ipcPath string) (*playerProcess, error) {

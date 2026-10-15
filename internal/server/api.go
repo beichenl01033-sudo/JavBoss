@@ -50,6 +50,10 @@ func RegisterRoutes(router gin.IRoutes) {
 	router.POST("/videos/playlist", playVideoPlaylist)
 	router.POST("/videos/open", openVideoFile)
 	router.POST("/videos/reveal", revealVideoLocation)
+	router.GET("/clips", listClipTasks)
+	router.POST("/clips/:id/cancel", cancelClipTask)
+	router.POST("/clips/:id/reveal", revealClipTask)
+	router.DELETE("/clips/:id", deleteClipTask)
 
 	router.GET("/directories", listDirectories)
 	router.POST("/directories", createDirectory)

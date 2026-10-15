@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ type playlistEvent struct {
 	Name    string          `json:"name"`
 	Data    json.RawMessage `json:"data"`
 }
+
+const clipRequestProperty = "user-data/javboss/clip-request"
 
 type playlistEvents struct {
 	conn      io.ReadWriteCloser
@@ -34,6 +37,7 @@ type playlistEvents struct {
 }
 
 var playlistWatchers sync.WaitGroup
+var independentEventWatchers sync.WaitGroup
 
 func newPlaylistEvents(endpoint string) (*playlistEvents, error) {
 	conn, err := dialMPVIPC(endpoint, ipcCommandTimeout)
@@ -65,7 +69,7 @@ func newPlaylistEvents(endpoint string) (*playlistEvents, error) {
 		_ = c.SetDeadline(time.Time{})
 	}
 	// Only explicit pauses and EOF stop an already started video's clock.
-	for i, name := range []string{"pause", "eof-reached"} {
+	for i, name := range []string{"pause", "eof-reached", clipRequestProperty} {
 		if err := json.NewEncoder(conn).Encode(ipcRequest{Command: []any{"observe_property", i + 1, name}, RequestID: int64(i + 2)}); err != nil {
 			conn.Close()
 			return nil, err
@@ -202,6 +206,17 @@ func (e *playlistEvents) handleAt(event playlistEvent, now time.Time) func() {
 		e.current = nil
 		e.loaded = false
 	case "property-change":
+		if event.Name == clipRequestProperty {
+			var raw string
+			if json.Unmarshal(event.Data, &raw) == nil && strings.TrimSpace(raw) != "" {
+				return func() {
+					if err := submitClipRequestJSON(raw); err != nil {
+						logging.Error("submit clip task: %v", err)
+					}
+				}
+			}
+			return nil
+		}
 		var value bool
 		if json.Unmarshal(event.Data, &value) == nil && string(event.Data) != "null" {
 			switch event.Name {
