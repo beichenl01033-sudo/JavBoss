@@ -207,13 +207,19 @@ func TestBundledJavBossControlSupportsHighlightsAndLosslessClips(t *testing.T) {
 		`".javboss-clip-"`,
 		`"-c", "copy"`,
 		`args = { "touch", "-m", "-r", source, output }`,
+		`return "'" .. tostring(value):gsub("'", "''") .. "'"`,
 		`"$target.LastWriteTimeUtc = $source.LastWriteTimeUtc"`,
-		`local timestamp_copied = copy_modified_time(source, output)`,
+		`local timestamp_copied = copy_modified_time(source, temp)`,
 		`prompt = "确认删除 "`,
 	} {
 		if !strings.Contains(string(control), expected) {
 			t.Fatalf("expected JavBoss control script to contain %q", expected)
 		}
+	}
+	timestampCheck := strings.Index(string(control), `local timestamp_copied = copy_modified_time(source, temp)`)
+	renameCheck := strings.Index(string(control), `local renamed, rename_error = os.rename(temp, output)`)
+	if timestampCheck < 0 || renameCheck < 0 || timestampCheck >= renameCheck {
+		t.Fatal("expected clip timestamp synchronization before the final rename")
 	}
 
 	modernZ, err := os.ReadFile(filepath.Join(sourceDir, "modernz.lua"))

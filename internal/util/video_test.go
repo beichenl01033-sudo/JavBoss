@@ -90,6 +90,10 @@ func TestIsVideoCandidateUsesKnownExtensionWithoutAcceptingText(t *testing.T) {
 	if !IsVideoCandidate(clipPath) {
 		t.Fatal("JavBoss lossless clips should remain scan candidates")
 	}
+	temporaryClipPath := clipPath + ".part.mp4"
+	if IsVideoCandidate(temporaryClipPath) {
+		t.Fatal("in-progress JavBoss lossless clips should not be scan candidates")
+	}
 
 	textPath := filepath.Join(dir, "sample.txt")
 	if err := os.WriteFile(textPath, []byte("ordinary text"), 0o600); err != nil {

@@ -299,19 +299,23 @@ local function next_output_path(path, start_time, end_time)
     return candidate, extension
 end
 
+local function powershell_literal(value)
+    return "'" .. tostring(value):gsub("'", "''") .. "'"
+end
+
 local function copy_modified_time(source, output)
     local args
     if package.config:sub(1, 1) == "\\" then
+        local source_literal = powershell_literal(source)
+        local output_literal = powershell_literal(output)
         args = {
             "powershell.exe",
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            "$source = Get-Item -LiteralPath $args[0]; " ..
-                "$target = Get-Item -LiteralPath $args[1]; " ..
+            "$source = Get-Item -LiteralPath " .. source_literal .. "; " ..
+                "$target = Get-Item -LiteralPath " .. output_literal .. "; " ..
                 "$target.LastWriteTimeUtc = $source.LastWriteTimeUtc",
-            source,
-            output,
         }
     else
         args = { "touch", "-m", "-r", source, output }
@@ -374,6 +378,9 @@ local function export_clip()
             osd("剪辑导出失败")
             return
         end
+        -- Apply the timestamp before the final atomic rename. Directory scans can
+        -- never observe the completed filename with FFmpeg's current timestamp.
+        local timestamp_copied = copy_modified_time(source, temp)
         local renamed, rename_error = os.rename(temp, output)
         if not renamed then
             os.remove(temp)
@@ -381,7 +388,6 @@ local function export_clip()
             osd("剪辑文件保存失败")
             return
         end
-        local timestamp_copied = copy_modified_time(source, output)
         clear_clip(false)
         if timestamp_copied then
             osd("剪辑已保存：" .. select(2, utils.split_path(output)), 5)
