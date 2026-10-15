@@ -134,6 +134,7 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 		"width=320\n",
 		"min_width=240\n",
 		"resize_handle_width=10\n",
+		"control_bar_height=96\n",
 		"font_size=18\n",
 		"font=auto\n",
 		"auto_hide_single=yes\n",
@@ -153,6 +154,8 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 		`local left = math.max(0, pane_left - math.floor(opts.resize_handle_width / 2))`,
 		`mp.commandv("playlist-play-index", index - 1)`,
 		`publish_width(pane_width * scale_x)`,
+		`pin_controls(true)`,
+		`value and "always" or "auto"`,
 		`{"mbtn_left", end_click, begin_click}`,
 		`if mouse_x and math.abs(mouse_x - pane_left) <= opts.resize_handle_width then`,
 		`{"mouse_move", handle_mouse_move}`,
@@ -161,7 +164,7 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 		`return "PingFang SC"`,
 		`return "Noto Sans CJK SC"`,
 		`\\fn%s`,
-		`update_interaction_area(width, height, dragging or handle_hovered)`,
+		`update_interaction_area(width, panel_bottom, dragging or handle_hovered)`,
 		`local changed = hovered ~= handle_hovered`,
 		`if not mouse_x or mouse_x < pane_left then`,
 		`}↔`,
@@ -175,7 +178,7 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 		`mp.add_hook("on_unload", 50, save_position_before_unload)`,
 		`mp.register_script_message("toggle", toggle_sidebar)`,
 		`sidebar_collapsed = true`,
-		`列表按钮展开/收起`,
+		`右上角 × 或列表按钮收起`,
 	} {
 		if !strings.Contains(string(script), expected) {
 			t.Fatalf("expected bundled playlist sidebar script to contain %q", expected)
@@ -254,11 +257,14 @@ func TestBundledJavBossControlSupportsHighlightsAndBackgroundClips(t *testing.T)
 		t.Fatalf("read JavBoss highlight sidebar: %v", err)
 	}
 	for _, expected := range []string{
+		`control_bar_height = 96`,
 		`mp.register_script_message("toggle", toggle_sidebar)`,
 		`mp.commandv("script-message-to", "javboss_control", "add-highlight")`,
 		`mp.commandv("script-message-to", "javboss_control", "confirm-delete-highlight", tostring(index))`,
 		`mp.commandv("script-message-to", "javboss_control", "rename-highlight", tostring(index))`,
 		`点击跳转 · 右键重命名 · × 删除`,
+		`math.floor(panel_bottom * scale_y + 0.5)`,
+		`pin_controls(true)`,
 	} {
 		if !strings.Contains(string(highlightSidebar), expected) {
 			t.Fatalf("expected highlight sidebar to contain %q", expected)

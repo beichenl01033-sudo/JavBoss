@@ -7,6 +7,7 @@ local opts = {
     max_width_ratio = 0.58,
     header_height = 58,
     footer_height = 34,
+    control_bar_height = 96,
     row_height = 42,
     font_size = 17,
     font = "auto",
@@ -37,9 +38,11 @@ local sidebar_collapsed = true
 local pane_left = 0
 local window_width = 0
 local window_height = 0
+local panel_bottom = 0
 local scale_x = 1
 local scale_y = 1
 local click_armed = false
+local controls_pinned = false
 
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
@@ -79,6 +82,12 @@ local function publish_width(value)
     if math.abs(current - value) > 0.5 then mp.set_property_number(width_property, value) end
 end
 
+local function pin_controls(value)
+    if controls_pinned == value then return end
+    controls_pinned = value
+    mp.commandv("script-message-to", "modernz", "osc-visibility", value and "always" or "auto")
+end
+
 local function hide_sidebar()
     if sidebar_visible then
         overlay:remove()
@@ -87,6 +96,7 @@ local function hide_sidebar()
         sidebar_visible = false
     end
     publish_width(0)
+    pin_controls(false)
     mp.set_property_bool("user-data/javboss/highlight-sidebar-open", false)
 end
 
@@ -122,14 +132,19 @@ local function render()
     pane_left = width - pane_width
     window_width = width
     window_height = height
-    visible_rows = math.max(1, math.floor((height - opts.header_height - opts.footer_height) / opts.row_height))
+    panel_bottom = math.max(
+        opts.header_height + opts.footer_height + opts.row_height,
+        height - opts.control_bar_height
+    )
+    visible_rows = math.max(1, math.floor((panel_bottom - opts.header_height - opts.footer_height) / opts.row_height))
 
     local items = highlights()
     visible_start = clamp(visible_start, 1, math.max(1, #items - visible_rows + 1))
     publish_width(pane_width * scale_x)
+    pin_controls(true)
 
     local parts = {}
-    append_rect(parts, pane_left, 0, width, height, "17191F", "08")
+    append_rect(parts, pane_left, 0, width, panel_bottom, "17191F", "08")
     append_rect(parts, pane_left, opts.header_height - 1, width, opts.header_height, "424650", "00")
     parts[#parts + 1] = string.format(
         "{\\an4\\pos(%d,%d)\\bord0\\shad0\\fs25\\b1\\fn%s\\1c&HFFFFFF&}%s",
@@ -147,7 +162,7 @@ local function render()
     if #items == 0 then
         parts[#parts + 1] = string.format(
             "{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs17\\fn%s\\1c&H9297A2&}暂无亮点，点击右上角 ＋ 添加",
-            pane_left + math.floor(pane_width / 2), math.floor(height / 2), sidebar_font
+            pane_left + math.floor(pane_width / 2), math.floor(panel_bottom / 2), sidebar_font
         )
     else
         local last_visible = math.min(#items, visible_start + visible_rows - 1)
@@ -175,10 +190,10 @@ local function render()
         end
     end
 
-    append_rect(parts, pane_left, height - opts.footer_height, width, height, "111319", "10")
+    append_rect(parts, pane_left, panel_bottom - opts.footer_height, width, panel_bottom, "111319", "10")
     parts[#parts + 1] = string.format(
         "{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs13\\fn%s\\1c&H9297A2&}点击跳转 · 右键重命名 · × 删除",
-        pane_left + math.floor(pane_width / 2), height - math.floor(opts.footer_height / 2), sidebar_font
+        pane_left + math.floor(pane_width / 2), panel_bottom - math.floor(opts.footer_height / 2), sidebar_font
     )
 
     overlay.res_x = width
@@ -186,7 +201,13 @@ local function render()
     overlay.z = 81
     overlay.data = table.concat(parts, "\n")
     overlay:update()
-    mp.set_mouse_area(math.floor(pane_left * scale_x), 0, pixel_width, pixel_height, section)
+    mp.set_mouse_area(
+        math.floor(pane_left * scale_x),
+        0,
+        pixel_width,
+        math.floor(panel_bottom * scale_y + 0.5),
+        section
+    )
     mp.enable_key_bindings(section, "allow-hide-cursor")
     sidebar_visible = true
     mp.set_property_bool("user-data/javboss/highlight-sidebar-open", true)
@@ -202,7 +223,7 @@ local function row_at_mouse()
     if not sidebar_visible then return nil end
     local mouse_x, mouse_y = get_mouse_position()
     if not mouse_x or not mouse_y or mouse_x < pane_left then return nil end
-    if mouse_y < opts.header_height or mouse_y >= window_height - opts.footer_height then return nil end
+    if mouse_y < opts.header_height or mouse_y >= panel_bottom - opts.footer_height then return nil end
     local row = math.floor((mouse_y - opts.header_height) / opts.row_height)
     local index = visible_start + row
     if index < 1 or index > #highlights() then return nil end

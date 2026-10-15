@@ -86,6 +86,11 @@ local function harness(scale, width, height, position)
         self:flush()
     end
     state:flush()
+    assert(state.commands[1][1] == "script-message-to")
+    assert(state.commands[1][2] == "modernz")
+    assert(state.commands[1][3] == "osc-visibility")
+    assert(state.commands[1][4] == "always")
+    state.commands = {}
     return state
 end
 
@@ -97,7 +102,8 @@ local function check_layout(state, logical_width, logical_height, pane_width)
     near(state.properties["user-data/javboss/playlist-sidebar-width"], pixel_pane_width)
     near(state.properties["video-margin-ratio-right"], 0)
     near(state.area[3], state.width)
-    near(state.area[4], state.height)
+    local panel_bottom = math.max(58 + 34 + 35, logical_height - 96)
+    near(state.area[4], panel_bottom * state.height / logical_height)
     assert(state.overlay.data:find("\\fs18", 1, true), "logical font size changed")
     assert(state.overlay.data:find("\\pos(" .. (logical_width - pane_width + 52) .. ",75)", 1, true))
 end
@@ -171,6 +177,11 @@ local function run_tests()
     local current = harness(1, 1000, 1200, 24)
     current:change("display-hidpi-scale", 2)
     assert(current.overlay.data:find("entry-25", 1, true), "DPI change scrolled the current entry out of view")
+
+    local closable = harness(1)
+    closable:click(980, 29)
+    assert(not closable.overlay.visible and not closable.enabled, "header close button did not collapse the sidebar")
+    near(closable.properties["user-data/javboss/playlist-sidebar-width"], 0)
 end
 
 local ok, err = pcall(run_tests)

@@ -10,6 +10,7 @@ local opts = {
     resize_handle_width = 10,
     header_height = 58,
     footer_height = 34,
+    control_bar_height = 96,
     row_height = 35,
     font_size = 18,
     font = "auto",
@@ -49,12 +50,14 @@ local current_width = opts.width
 local pane_left = 0
 local window_width = 0
 local window_height = 0
+local panel_bottom = 0
 local scale_x = 1
 local scale_y = 1
 local dragging = false
 local click_armed = false
 local handle_hovered = false
 local handle_mouse_y = nil
+local controls_pinned = false
 
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
@@ -96,6 +99,12 @@ local function publish_width(value)
     end
 end
 
+local function pin_controls(value)
+    if controls_pinned == value then return end
+    controls_pinned = value
+    mp.commandv("script-message-to", "modernz", "osc-visibility", value and "always" or "auto")
+end
+
 local function hide_sidebar()
     if sidebar_visible then
         overlay:remove()
@@ -106,6 +115,7 @@ local function hide_sidebar()
     handle_hovered = false
     handle_mouse_y = nil
     publish_width(0)
+    pin_controls(false)
 end
 
 local function playlist_position(playlist)
@@ -128,12 +138,12 @@ end
 
 local function update_interaction_area(width, height, expanded)
     local pixel_width = math.floor(width * scale_x + 0.5)
-    local pixel_height = math.floor(height * scale_y + 0.5)
+    local pixel_bottom = math.floor(panel_bottom * scale_y + 0.5)
     if expanded then
-        mp.set_mouse_area(0, 0, pixel_width, pixel_height, section)
+        mp.set_mouse_area(0, 0, pixel_width, pixel_bottom, section)
     else
         local left = math.max(0, pane_left - math.floor(opts.resize_handle_width / 2))
-        mp.set_mouse_area(math.floor(left * scale_x), 0, pixel_width, pixel_height, section)
+        mp.set_mouse_area(math.floor(left * scale_x), 0, pixel_width, pixel_bottom, section)
     end
 end
 
@@ -202,8 +212,12 @@ local function render()
     pane_left = width - pane_width
     window_width = width
     window_height = height
+    panel_bottom = math.max(
+        opts.header_height + opts.footer_height + opts.row_height,
+        height - opts.control_bar_height
+    )
     local previous_visible_rows = visible_rows
-    visible_rows = math.max(1, math.floor((height - opts.header_height - opts.footer_height) / opts.row_height))
+    visible_rows = math.max(1, math.floor((panel_bottom - opts.header_height - opts.footer_height) / opts.row_height))
     local current = playlist_position(playlist)
     if current ~= last_playlist_pos or visible_rows ~= previous_visible_rows then
         ensure_current_visible(current, count)
@@ -213,9 +227,10 @@ local function render()
     end
 
     publish_width(pane_width * scale_x)
+    pin_controls(true)
 
     local parts = {}
-    append_rect(parts, pane_left, 0, width, height, "17191F", "08")
+    append_rect(parts, pane_left, 0, width, panel_bottom, "17191F", "08")
     append_rect(parts, pane_left, opts.header_height - 1, width, opts.header_height, "424650", "00")
     parts[#parts + 1] = string.format(
         "{\\an4\\pos(%d,%d)\\bord0\\shad0\\fs25\\b1\\fsp0\\fn%s\\1c&HFFFFFF&}%s",
@@ -276,19 +291,19 @@ local function render()
         )
     end
 
-    append_rect(parts, pane_left, height - opts.footer_height, width, height, "111319", "10")
+    append_rect(parts, pane_left, panel_bottom - opts.footer_height, width, panel_bottom, "111319", "10")
     local handle_active = dragging or handle_hovered
     append_rect(
         parts,
         pane_left,
         0,
         pane_left + (handle_active and 4 or 2),
-        height,
+        panel_bottom,
         handle_active and "F0A34A" or "555A65",
         "00"
     )
     if handle_active then
-        local handle_y = clamp(handle_mouse_y or math.floor(height / 2), 24, height - 24)
+        local handle_y = clamp(handle_mouse_y or math.floor(panel_bottom / 2), 24, panel_bottom - 24)
         append_rect(parts, pane_left - 13, handle_y - 20, pane_left + 15, handle_y + 20, "272A32", "00")
         parts[#parts + 1] = string.format(
             "{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs23\\b1\\fn%s\\1c&HF0A34A&}↔",
@@ -298,13 +313,13 @@ local function render()
         )
     end
     parts[#parts + 1] = string.format(
-        "{\\an5\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs14\\b0\\fsp0\\fn%s\\1c&H9297A2&}拖动左边缘调宽 · 列表按钮展开/收起 · 点击播放",
+        "{\\an5\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs14\\b0\\fsp0\\fn%s\\1c&H9297A2&}拖动左边缘调宽 · 右上角 × 或列表按钮收起 · 点击播放",
         pane_left + math.floor(pane_width / 2),
-        height - math.floor(opts.footer_height / 2),
+        panel_bottom - math.floor(opts.footer_height / 2),
         pane_left + 6,
-        height - opts.footer_height,
+        panel_bottom - opts.footer_height,
         width - 6,
-        height,
+        panel_bottom,
         sidebar_font
     )
 
@@ -315,7 +330,7 @@ local function render()
     -- only honors a single position, which collapses the labels and rows.
     overlay.data = table.concat(parts, "\n")
     overlay:update()
-    update_interaction_area(width, height, dragging or handle_hovered)
+    update_interaction_area(width, panel_bottom, dragging or handle_hovered)
     mp.enable_key_bindings(section, "allow-hide-cursor")
     sidebar_visible = true
 end
