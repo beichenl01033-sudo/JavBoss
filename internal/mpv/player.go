@@ -18,7 +18,6 @@ import (
 
 	"javboss/internal/common/logging"
 	"javboss/internal/playback"
-	"javboss/internal/util"
 )
 
 const playbackScreenshotTemplate = "mpv_%wH-%wM-%wS.%wT"
@@ -135,8 +134,30 @@ func playVideoInNewProcess(path string, options PlayOptions) error {
 	if _, err := playerProcesses.start(cmd, ipcPath); err != nil {
 		return fmt.Errorf("play video: %w", err)
 	}
+	startIndependentPlayerEvents(ipcPath)
 	focusStartedProcessWindow(cmd.Process.Pid, "play video")
 	return nil
+}
+
+func startIndependentPlayerEvents(ipcPath string) {
+	independentEventWatchers.Add(1)
+	go func() {
+		defer independentEventWatchers.Done()
+		watchIndependentPlayerEvents(ipcPath)
+	}()
+}
+
+func watchIndependentPlayerEvents(ipcPath string) {
+	if err := waitForIPCReady(ipcPath); err != nil {
+		logging.Error("start independent mpv event listener: %v", err)
+		return
+	}
+	events, err := newPlaylistEvents(ipcPath)
+	if err != nil {
+		logging.Error("connect independent mpv event listener: %v", err)
+		return
+	}
+	<-events.done
 }
 
 func playPlaylistInNewProcess(items []PlaylistItem, startIndex int) error {
@@ -492,9 +513,6 @@ func buildCommandArgs(path string, options PlayOptions, ipcPath string, startIdl
 	args = append(args, "--script="+modernZ.PlaylistScriptPath)
 	args = append(args, "--script="+modernZ.ControlScriptPath)
 	args = append(args, "--script="+modernZ.HighlightSidebarPath)
-	if ffmpegPath, resolveErr := util.ResolveFFmpegPath(); resolveErr == nil {
-		args = append(args, "--script-opt=javboss_control-ffmpeg_path="+ffmpegPath)
-	}
 	if runtime.GOOS == "darwin" {
 		args = append(args, "--script="+modernZ.WindowGeometryScriptPath)
 	}

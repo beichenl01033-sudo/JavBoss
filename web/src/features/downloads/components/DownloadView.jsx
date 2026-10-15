@@ -3,10 +3,12 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import AppModal from '@/shared/ui/AppModal'
 import DownloaderSettingsView from '@/features/downloads/components/DownloaderSettingsView'
 import DownloadsView from '@/features/downloads/components/DownloadsView'
+import ClipTasksView from '@/features/clips/components/ClipTasksView'
 import { zh } from '@/utils/i18n'
 
 const tabs = [
   { id: 'jobs', label: zh('下载任务', 'Downloads') },
+  { id: 'clips', label: zh('剪辑任务', 'Clip tasks') },
   {
     id: 'settings',
     label: zh('下载设置', 'Download settings'),
@@ -73,6 +75,8 @@ export default function DownloadView({ open, onClose, onToast }) {
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-3">
             <DownloaderSettingsView />
           </div>
+        ) : activeTab === 'clips' ? (
+          <ClipTasksView onToast={onToast} />
         ) : (
           <DownloadsView onToast={onToast} />
         )}
