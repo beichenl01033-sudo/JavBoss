@@ -7,6 +7,8 @@ import {
   IDOL_SORT_OPTIONS,
   JAV_SORT_OPTIONS,
   JAV_SORT_RULE_FILTERS,
+  JAV_ENTITY_OPEN_MODE_MODAL,
+  JAV_ENTITY_OPEN_MODE_PAGE,
   findSortOption,
   reverseSortValue,
   sortLabel,
@@ -331,6 +333,8 @@ export default function JavSettingsModal({
   onJavHideActionsChange,
   javFavoriteRatingShowFullInput = false,
   onJavFavoriteRatingShowFullChange,
+  javEntityOpenModeInput = JAV_ENTITY_OPEN_MODE_MODAL,
+  onJavEntityOpenModeChange,
   javWaterfallDefaultInput = false,
   onJavWaterfallDefaultChange,
   idolPageSizeInput,
@@ -404,6 +408,7 @@ export default function JavSettingsModal({
         onJavHideTagsChange?.(false)
         onJavHideActionsChange?.(false)
         onJavFavoriteRatingShowFullChange?.(false)
+        onJavEntityOpenModeChange?.(JAV_ENTITY_OPEN_MODE_MODAL)
         onJavSortChange?.(JAV_SORT_OPTIONS[0]?.defaultValue || 'recent')
         onJavSortRulesChange?.([])
         break
@@ -585,6 +590,29 @@ export default function JavSettingsModal({
                   />
                 </SettingsRow>
               </div>
+            </SettingsSection>
+
+            <SettingsSection title={zh('打开方式', 'Open behavior')}>
+              <SettingsRow
+                label={zh('女优、片商、系列封面点击', 'Idol, studio, and series cover click')}
+              >
+                <select
+                  aria-label={zh(
+                    '女优、片商、系列封面点击方式',
+                    'Idol, studio, and series cover click behavior'
+                  )}
+                  value={javEntityOpenModeInput}
+                  onChange={(event) => onJavEntityOpenModeChange?.(event.target.value)}
+                  className={controlClassName}
+                >
+                  <option value={JAV_ENTITY_OPEN_MODE_MODAL}>
+                    {zh('浮层显示相关作品', 'Show related works in overlay')}
+                  </option>
+                  <option value={JAV_ENTITY_OPEN_MODE_PAGE}>
+                    {zh('进入作品列表', 'Open the works list')}
+                  </option>
+                </select>
+              </SettingsRow>
             </SettingsSection>
 
             <SettingsSection title={zh('排序规则', 'Sort rules')}>

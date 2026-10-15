@@ -40,6 +40,7 @@ export default function JavStudioView({
   onLast,
   items,
   onSelectStudio,
+  onOpenStudioWorks,
   onSelectSeries,
   onSelectPrefix,
   onOpenFavorites,
@@ -79,6 +80,7 @@ export default function JavStudioView({
         <JavStudioGrid
           items={items}
           onSelectStudio={onSelectStudio}
+          onOpenStudioWorks={onOpenStudioWorks}
           onSelectPrefix={onSelectPrefix}
           onOpenFavorites={onOpenFavorites}
           onOpenSeriesFavorites={onOpenSeriesFavorites}
@@ -101,6 +103,7 @@ export default function JavStudioView({
 function JavStudioGrid({
   items,
   onSelectStudio,
+  onOpenStudioWorks,
   onSelectSeries,
   onSelectPrefix,
   onOpenFavorites,
@@ -140,6 +143,7 @@ function JavStudioGrid({
             item={item}
             href={buildStudioUrl?.(item)}
             onSelectStudio={onSelectStudio}
+            onOpenWorks={onOpenStudioWorks}
             onSelectSeries={onSelectSeries}
             onSelectPrefix={onSelectPrefix}
             onOpenFavorites={onOpenFavorites}
@@ -177,6 +181,7 @@ export function StudioCard({
   item,
   href,
   onSelectStudio,
+  onOpenWorks,
   onSelectSeries,
   onSelectPrefix,
   onOpenFavorites,
@@ -219,7 +224,11 @@ export function StudioCard({
     if (String(window.getSelection?.() || '').trim()) return
     clearSeriesHoverTimer()
     closeSeriesPreview()
-    openStudioDetail(item)
+    if (onOpenWorks) {
+      onOpenWorks(item)
+      return
+    }
+    openStudioDetail?.(item)
   }
 
   const handleStudioClick = (event) => {
@@ -338,7 +347,11 @@ export function StudioCard({
       <div
         role="button"
         tabIndex={0}
-        aria-label={zh(`查看片商 ${name} 的详情`, `View details for studio ${name}`)}
+        aria-label={
+          onOpenWorks
+            ? zh(`查看片商 ${name} 的作品`, `View works for studio ${name}`)
+            : zh(`查看片商 ${name} 的详情`, `View details for studio ${name}`)
+        }
         aria-haspopup="dialog"
         className="card-hover-scope group flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition hover:shadow-lg"
         onClick={handleOpenDetail}

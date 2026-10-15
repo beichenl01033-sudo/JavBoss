@@ -16,12 +16,19 @@ test('settings drafts stay local and a reopened dialog reads persisted values', 
   )
   const javDraft = model.createJavSettingsDraft({
     ...state,
-    config: { jav_hide_tags: 'false', jav_hide_series: '1', jav_watch_time_icon_minutes: '15' },
+    config: {
+      jav_hide_tags: 'false',
+      jav_hide_series: '1',
+      jav_watch_time_icon_minutes: '15',
+      jav_entity_open_mode: 'page',
+    },
   })
   assert.equal(javDraft.javWatchTimeIconMinutesInput, 15)
   assert.equal(model.createJavSettingsDraft(state).javWatchTimeIconMinutesInput, 30)
   assert.equal(javDraft.javHideTagsInput, false)
   assert.equal(javDraft.javHideSeriesInput, true)
+  assert.equal(javDraft.javEntityOpenModeInput, 'page')
+  assert.equal(model.createJavSettingsDraft(state).javEntityOpenModeInput, 'modal')
 })
 
 test('saving video settings persists normalized values and clamps the current page', async (t) => {
@@ -70,6 +77,27 @@ test('a failed settings save leaves configuration and list state unchanged', asy
     })
   )
   assert.equal(useStore.getState(), before)
+})
+
+test('JAV entity cover open mode is persisted and applied to reopened settings', async (t) => {
+  const [model, actions, { useStore }] = await loadModules(t, [
+    'features/settings/model.js',
+    'features/settings/actions.js',
+    'store.js',
+  ])
+  let payload
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    payload = JSON.parse(init.body)
+    return Response.json(payload)
+  })
+
+  const draft = model.createJavSettingsDraft(useStore.getState())
+  assert.equal(draft.javEntityOpenModeInput, 'modal')
+  draft.javEntityOpenModeInput = 'page'
+  await actions.saveJavSettings(draft, () => {})
+
+  assert.equal(payload.jav_entity_open_mode, 'page')
+  assert.equal(model.createJavSettingsDraft(useStore.getState()).javEntityOpenModeInput, 'page')
 })
 
 test('JAV watch icon settings persist independently and invalid values use 30 minutes', async (t) => {

@@ -17,6 +17,7 @@ import useSectionNavigation from '@/navigation/useSectionNavigation'
 import useDocumentTitle from '@/shared/hooks/useDocumentTitle'
 import { buildLibraryPageTitle, formatPageTitle } from '@/navigation/pageTitle'
 import useJavSelection from '@/features/jav/hooks/useJavSelection'
+import useJavEntityWorks from '@/features/jav/hooks/useJavEntityWorks'
 import SideTabs from '@/app/layout/SideTabs'
 import TopBar from '@/app/layout/TopBar'
 import {
@@ -30,6 +31,7 @@ import JavRoute from '@/routes/JavRoute'
 import VideoRoute from '@/routes/VideoRoute'
 import JavDetailRoute from '@/features/jav/components/JavDetailRoute'
 import JavStudioDetailModal from '@/features/jav/components/JavStudioDetailModal'
+import JavEntityWorksModal from '@/features/jav/components/JavEntityWorksModal'
 import DownloadView from '@/features/downloads/components/DownloadView'
 import JavQueryEditorModal from '@/features/jav/components/JavQueryEditorModal'
 import { configFlag } from '@/utils/config'
@@ -461,6 +463,19 @@ export default function App() {
     applyJavTagFilter,
   })
 
+  const {
+    entityWorksModal,
+    closeEntityWorks,
+    selectCatalogIdol,
+    selectCatalogStudio,
+    selectCatalogSeries,
+  } = useJavEntityWorks({
+    config,
+    onSelectIdolPage: handleSelectIdol,
+    onSelectStudioPage: handleSelectStudio,
+    onSelectSeriesPage: handleSelectSeries,
+  })
+
   const handleOpenJavTagModal = useCallback(() => {
     loadJavTags()
     setJavTagModalOpen(true)
@@ -674,12 +689,13 @@ export default function App() {
                 hydrated={hydrated}
                 configLoaded={configLoaded}
                 buildJavUrl={buildJavUrl}
-                handleSelectStudio={handleSelectStudio}
-                handleSelectIdol={handleSelectIdol}
+                handleSelectStudio={selectCatalogStudio}
+                handleSelectIdol={selectCatalogIdol}
+                handleOpenStudioWorks={selectCatalogStudio}
                 handleOpenIdolFavoriteModal={handleOpenIdolFavoriteModal}
                 waterfallModes={waterfallModes}
                 setWaterfallMode={setWaterfallMode}
-                handleSelectSeries={handleSelectSeries}
+                handleSelectSeries={selectCatalogSeries}
                 handleSelectJavPrefix={handleSelectJavPrefix}
                 handleOpenFavoriteModal={handleOpenFavoriteModal}
                 javSelection={javSelection}
@@ -716,6 +732,30 @@ export default function App() {
           </JavDetailNavigationContext.Provider>
         </StudioDetailNavigationContext.Provider>
       </main>
+      {configLoaded && hydrated && entityWorksModal ? (
+        <JavDetailNavigationContext.Provider value={openJavDetail}>
+          <JavEntityWorksModal
+            key={`${entityWorksModal.type}-${entityWorksModal.id}`}
+            entity={entityWorksModal}
+            onClose={closeEntityWorks}
+            buildJavUrl={buildJavUrl}
+            actions={{
+              ...javCardActions,
+              onIdolClick: selectCatalogIdol,
+              onStudioClick: selectCatalogStudio,
+              onSeriesClick: selectCatalogSeries,
+              onPrefixClick: (item) => {
+                closeEntityWorks()
+                handleSelectJavPrefix(item)
+              },
+              onTagClick: (item) => {
+                closeEntityWorks()
+                handleJavTagClick(item)
+              },
+            }}
+          />
+        </JavDetailNavigationContext.Provider>
+      ) : null}
       {configLoaded && hydrated && javDetailId ? (
         <StudioDetailNavigationContext.Provider value={openStudioDetail}>
           <JavDetailRoute

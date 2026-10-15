@@ -284,6 +284,42 @@ func TestUpdateConfigPersistsFileModifiedSort(t *testing.T) {
 	}
 }
 
+func TestUpdateConfigPersistsJavEntityOpenMode(t *testing.T) {
+	testAuthService(t)
+	router := gin.New()
+	router.PATCH("/config", updateConfig)
+
+	for _, mode := range []string{"modal", "page"} {
+		req := httptest.NewRequest(
+			http.MethodPatch,
+			"/config",
+			strings.NewReader(`{"jav_entity_open_mode":"`+mode+`"}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		if response.Code != http.StatusOK {
+			t.Fatalf("mode=%s status=%d body=%s", mode, response.Code, response.Body)
+		}
+		cfg, err := dbpkg.ListConfig(context.Background())
+		if err != nil || cfg["jav_entity_open_mode"] != mode {
+			t.Fatalf("mode=%s saved=%q err=%v", mode, cfg["jav_entity_open_mode"], err)
+		}
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/config",
+		strings.NewReader(`{"jav_entity_open_mode":"invalid"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, req)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("invalid mode status=%d body=%s", response.Code, response.Body)
+	}
+}
+
 func TestUpdateConfigPersistsJavSortRules(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	database, err := dbpkg.Open(filepath.Join(t.TempDir(), "config.db"))

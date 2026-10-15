@@ -7,6 +7,7 @@ import {
   normalizeIdolSort,
   javSortRulesConfig,
   normalizeJavSortRules,
+  normalizeJavEntityOpenMode,
 } from '@/constants/jav'
 
 export async function saveVideoSettings(draft, onWaterfallChange) {
@@ -59,6 +60,7 @@ export async function saveJavSettings(draft, onWaterfallChange) {
     javHideTagsInput,
     javHideActionsInput,
     javFavoriteRatingShowFullInput,
+    javEntityOpenModeInput,
     javWaterfallDefaultInput,
     idolPageSizeInput,
     idolWaterfallDefaultInput,
@@ -128,6 +130,7 @@ export async function saveJavSettings(draft, onWaterfallChange) {
     jav_hide_tags: Boolean(javHideTagsInput),
     jav_hide_actions: Boolean(javHideActionsInput),
     jav_favorite_rating_show_full: Boolean(javFavoriteRatingShowFullInput),
+    jav_entity_open_mode: normalizeJavEntityOpenMode(javEntityOpenModeInput),
     jav_waterfall_default: waterfallDefaults.jav,
     idol_page_size: idolSize,
     idol_waterfall_default: waterfallDefaults.idol,
