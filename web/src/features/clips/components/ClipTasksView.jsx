@@ -193,6 +193,17 @@ export default function ClipTasksView({ onToast }) {
                           </Tooltip>
                         ) : null}
                       </span>
+                      {item.network_optimized ? (
+                        <span
+                          className="inline-flex rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-violet-700"
+                          title={zh(
+                            '先在本机临时目录剪辑，再写回网络盘',
+                            'Clip locally first, then write back to the network drive'
+                          )}
+                        >
+                          {zh('NAS 加速', 'NAS optimized')}
+                        </span>
+                      ) : null}
                       <span className="text-[10px] font-medium text-gray-500">
                         {formatTime(item.created_at)}
                       </span>
