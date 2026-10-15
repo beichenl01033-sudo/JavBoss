@@ -338,6 +338,69 @@ local function clip_menu()
     })
 end
 
+local function has_track(track_type)
+    for _, track in ipairs(mp.get_property_native("track-list", {}) or {}) do
+        if track.type == track_type then return true end
+    end
+    return false
+end
+
+local function speed_menu()
+    if not input_ok then return end
+    local values = { 0.5, 0.75, 1, 1.25, 1.5, 2 }
+    local items = {}
+    local current = mp.get_property_number("speed", 1) or 1
+    for index, value in ipairs(values) do
+        local label = string.format("%gx", value)
+        if math.abs(current - value) < 0.001 then label = "✓ " .. label end
+        items[index] = label
+    end
+    input.select({
+        prompt = "播放速度",
+        items = items,
+        submit = function(index)
+            local value = values[index]
+            if value then mp.set_property_number("speed", value) end
+        end,
+    })
+end
+
+local function more_menu()
+    if not input_ok then
+        osd("当前 MPV 不支持更多菜单")
+        return
+    end
+    local items = {}
+    local actions = {}
+    local function add(label, action)
+        items[#items + 1] = label
+        actions[#actions + 1] = action
+    end
+
+    if has_track("audio") then
+        add("音轨…", function() mp.commandv("script-binding", "select/select-aid") end)
+    end
+    if has_track("sub") then
+        add("字幕…", function() mp.commandv("script-binding", "select/select-sid") end)
+    end
+    local speed = mp.get_property_number("speed", 1) or 1
+    add(string.format("倍速… (%gx)", speed), speed_menu)
+    local ontop = mp.get_property_native("ontop", false)
+    add(ontop and "取消窗口置顶" or "窗口置顶", function()
+        mp.set_property_bool("ontop", not mp.get_property_native("ontop", false))
+    end)
+    add("媒体信息", function() mp.commandv("script-binding", "stats/display-page-1-toggle") end)
+
+    input.select({
+        prompt = "更多",
+        items = items,
+        submit = function(index)
+            local action = actions[index]
+            if action then action() end
+        end,
+    })
+end
+
 local function clip_click()
     if not clip_supported() then
         osd("远程视频暂不支持剪辑")
@@ -377,6 +440,7 @@ mp.register_script_message("clip-click", clip_click)
 mp.register_script_message("clip-menu", clip_menu)
 mp.register_script_message("export-clip", export_clip)
 mp.register_script_message("clear-clip", function() clear_clip(true) end)
+mp.register_script_message("more-menu", more_menu)
 
 mp.register_event("file-loaded", function()
     local chapters = mp.get_property_native("chapter-list", {}) or {}

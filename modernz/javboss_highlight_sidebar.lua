@@ -29,7 +29,6 @@ local sidebar_font = resolve_font():gsub("[\\{}]", "")
 local section = "javboss-highlight-sidebar"
 local width_property = "user-data/javboss/playlist-sidebar-width"
 local overlay = mp.create_osd_overlay("ass-events")
-local base_margin_right = mp.get_property_number("video-margin-ratio-right", 0) or 0
 local visible_start = 1
 local visible_rows = 0
 local render_pending = false
@@ -75,13 +74,6 @@ local function highlights()
     return items
 end
 
-local function set_margin(value)
-    local current = mp.get_property_number("video-margin-ratio-right", base_margin_right) or base_margin_right
-    if math.abs(current - value) > 0.0001 then
-        mp.set_property_number("video-margin-ratio-right", value)
-    end
-end
-
 local function publish_width(value)
     local current = mp.get_property_number(width_property, 0) or 0
     if math.abs(current - value) > 0.5 then mp.set_property_number(width_property, value) end
@@ -95,7 +87,6 @@ local function hide_sidebar()
         sidebar_visible = false
     end
     publish_width(0)
-    set_margin(base_margin_right)
     mp.set_property_bool("user-data/javboss/highlight-sidebar-open", false)
 end
 
@@ -135,7 +126,6 @@ local function render()
 
     local items = highlights()
     visible_start = clamp(visible_start, 1, math.max(1, #items - visible_rows + 1))
-    set_margin(math.min(0.9, base_margin_right + pane_width / width))
     publish_width(pane_width * scale_x)
 
     local parts = {}
