@@ -73,10 +73,20 @@ func (m *VideoMetadata) FingerprintV2(size int64) string {
 // video-stream validation. Known video extensions are accepted as candidates so
 // uncommon or newer container signatures are not filtered out prematurely.
 func IsVideoCandidate(path string) bool {
+	if isTemporaryJavBossClip(path) {
+		return false
+	}
 	if hasVideoExtension(filepath.Ext(path)) {
 		return true
 	}
 	return IsVideo(path)
+}
+
+func isTemporaryJavBossClip(path string) bool {
+	name := strings.ToLower(filepath.Base(path))
+	extension := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, extension)
+	return strings.Contains(stem, ".javboss-clip-") && strings.HasSuffix(stem, ".part")
 }
 
 // IsVideo detects video content by inspecting the initial bytes and matching
