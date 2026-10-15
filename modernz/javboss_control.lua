@@ -69,6 +69,7 @@ local function publish_highlights()
     table.sort(chapters, function(a, b) return a.time < b.time end)
     mp.set_property_native("chapter-list", chapters)
     mp.set_property_number("user-data/javboss/highlight-count", #highlights)
+    mp.set_property_native("user-data/javboss/highlights", highlights)
 end
 
 local function save_highlights()
@@ -196,6 +197,23 @@ local function choose_highlight(prompt, callback)
     input.select({ prompt = prompt, items = items, submit = callback })
 end
 
+local function confirm_delete_highlight(index)
+    index = tonumber(index)
+    local target = index and highlights[index] or nil
+    if not target then return end
+    if not input_ok then
+        delete_highlight(index)
+        return
+    end
+    input.select({
+        prompt = "确认删除 " .. format_time(target.time) .. "?",
+        items = { "取消", "确认删除" },
+        submit = function(confirm_index)
+            if confirm_index == 2 then delete_highlight(index) end
+        end,
+    })
+end
+
 local function manage_highlights()
     if not input_ok then
         osd("当前 MPV 不支持亮点管理菜单")
@@ -225,15 +243,7 @@ local function manage_highlights()
                 choose_highlight("选择要重命名的亮点", rename_highlight)
             elseif action == "删除亮点…" then
                 choose_highlight("选择要删除的亮点", function(delete_index)
-                    local target = highlights[delete_index]
-                    if not target then return end
-                    input.select({
-                        prompt = "确认删除 " .. format_time(target.time) .. "?",
-                        items = { "取消", "确认删除" },
-                        submit = function(confirm_index)
-                            if confirm_index == 2 then delete_highlight(delete_index) end
-                        end,
-                    })
+                    confirm_delete_highlight(delete_index)
                 end)
             elseif action == "清空全部亮点…" then
                 input.select({
@@ -407,6 +417,8 @@ end
 
 mp.register_script_message("add-highlight", add_highlight)
 mp.register_script_message("manage-highlights", manage_highlights)
+mp.register_script_message("rename-highlight", function(index) rename_highlight(tonumber(index)) end)
+mp.register_script_message("confirm-delete-highlight", confirm_delete_highlight)
 mp.register_script_message("clear-highlights", function()
     highlights = {}
     if save_highlights() then
@@ -437,4 +449,5 @@ mp.register_event("end-file", function()
     highlight_path = nil
     clear_clip(false)
     mp.set_property_number("user-data/javboss/highlight-count", 0)
+    mp.set_property_native("user-data/javboss/highlights", {})
 end)

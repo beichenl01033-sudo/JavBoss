@@ -9,15 +9,16 @@ import (
 
 func TestEnsureModernZAssetsCopiesScriptOptionsAndFont(t *testing.T) {
 	files := map[string]string{
-		"modernz.lua":           "-- test lua\n",
-		"modernz.conf":          "layout=modern\n",
-		"modernz-icons.ttf":     "test font",
-		"thumbfast.lua":         "-- thumbfast lua\n",
-		"thumbfast.conf":        "max_height=200\n",
-		"playlist_sidebar.lua":  "-- playlist sidebar lua\n",
-		"playlist_sidebar.conf": "width=280\n",
-		"javboss_control.lua":   "-- javboss control lua\n",
-		"window_geometry.lua":   "-- window geometry lua\n",
+		"modernz.lua":                   "-- test lua\n",
+		"modernz.conf":                  "layout=modern\n",
+		"modernz-icons.ttf":             "test font",
+		"thumbfast.lua":                 "-- thumbfast lua\n",
+		"thumbfast.conf":                "max_height=200\n",
+		"playlist_sidebar.lua":          "-- playlist sidebar lua\n",
+		"playlist_sidebar.conf":         "width=280\n",
+		"javboss_control.lua":           "-- javboss control lua\n",
+		"javboss_highlight_sidebar.lua": "-- javboss highlight sidebar lua\n",
+		"window_geometry.lua":           "-- window geometry lua\n",
 	}
 	sourceDir := writeModernZTestAssets(t)
 
@@ -29,18 +30,20 @@ func TestEnsureModernZAssetsCopiesScriptOptionsAndFont(t *testing.T) {
 	}
 
 	expected := map[string]string{
-		filepath.Join(assets.ConfigDir, "scripts", "modernz.lua"):               files["modernz.lua"],
-		filepath.Join(assets.ConfigDir, "script-opts", "modernz.conf"):          files["modernz.conf"],
-		filepath.Join(assets.ConfigDir, "fonts", "modernz-icons.ttf"):           files["modernz-icons.ttf"],
-		filepath.Join(assets.ConfigDir, "scripts", "thumbfast.lua"):             files["thumbfast.lua"],
-		filepath.Join(assets.ConfigDir, "script-opts", "thumbfast.conf"):        files["thumbfast.conf"],
-		filepath.Join(assets.ConfigDir, "scripts", "playlist_sidebar.lua"):      files["playlist_sidebar.lua"],
-		filepath.Join(assets.ConfigDir, "script-opts", "playlist_sidebar.conf"): files["playlist_sidebar.conf"],
-		filepath.Join(assets.ConfigDir, "scripts", "javboss_control.lua"):       files["javboss_control.lua"],
+		filepath.Join(assets.ConfigDir, "scripts", "modernz.lua"):                   files["modernz.lua"],
+		filepath.Join(assets.ConfigDir, "script-opts", "modernz.conf"):              files["modernz.conf"],
+		filepath.Join(assets.ConfigDir, "fonts", "modernz-icons.ttf"):               files["modernz-icons.ttf"],
+		filepath.Join(assets.ConfigDir, "scripts", "thumbfast.lua"):                 files["thumbfast.lua"],
+		filepath.Join(assets.ConfigDir, "script-opts", "thumbfast.conf"):            files["thumbfast.conf"],
+		filepath.Join(assets.ConfigDir, "scripts", "playlist_sidebar.lua"):          files["playlist_sidebar.lua"],
+		filepath.Join(assets.ConfigDir, "script-opts", "playlist_sidebar.conf"):     files["playlist_sidebar.conf"],
+		filepath.Join(assets.ConfigDir, "scripts", "javboss_control.lua"):           files["javboss_control.lua"],
+		filepath.Join(assets.ConfigDir, "scripts", "javboss_highlight_sidebar.lua"): files["javboss_highlight_sidebar.lua"],
 		assets.ScriptPath:               files["modernz.lua"],
 		assets.ThumbfastScriptPath:      files["thumbfast.lua"],
 		assets.PlaylistScriptPath:       files["playlist_sidebar.lua"],
 		assets.ControlScriptPath:        files["javboss_control.lua"],
+		assets.HighlightSidebarPath:     files["javboss_highlight_sidebar.lua"],
 		assets.WindowGeometryScriptPath: files["window_geometry.lua"],
 	}
 	for path, content := range expected {
@@ -74,6 +77,10 @@ func TestBundledModernZEnablesFullscreenAutohide(t *testing.T) {
 		"playpause_size=22\n",
 		"midbuttons_size=19\n",
 		"sidebuttons_size=19\n",
+		"highlight_button=yes\n",
+		"clip_button=yes\n",
+		"playlist_mbtn_left_command=script-message-to playlist_sidebar toggle\n",
+		"highlight_mbtn_left_command=script-message-to javboss_highlight_sidebar toggle\n",
 	} {
 		if !strings.Contains(string(config), expected) {
 			t.Fatalf("expected bundled ModernZ config to contain %q", expected)
@@ -152,6 +159,9 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 		`mp.get_property_native("eof-reached", false)`,
 		`mp.commandv("write-watch-later-config")`,
 		`mp.add_hook("on_unload", 50, save_position_before_unload)`,
+		`mp.register_script_message("toggle", toggle_sidebar)`,
+		`sidebar_collapsed = true`,
+		`列表按钮展开/收起`,
 	} {
 		if !strings.Contains(string(script), expected) {
 			t.Fatalf("expected bundled playlist sidebar script to contain %q", expected)
@@ -208,13 +218,29 @@ func TestBundledJavBossControlSupportsHighlightsAndLosslessClips(t *testing.T) {
 		t.Fatalf("read ModernZ script: %v", err)
 	}
 	for _, expected := range []string{
-		`highlight_mbtn_left_command = "script-message-to javboss_control add-highlight"`,
+		`highlight_mbtn_left_command = "script-message-to javboss_highlight_sidebar toggle"`,
 		`clip_mbtn_left_command = "script-message-to javboss_control clip-click"`,
 		`new_element("highlight", "button")`,
 		`new_element("clip", "button")`,
 	} {
 		if !strings.Contains(string(modernZ), expected) {
 			t.Fatalf("expected ModernZ script to contain %q", expected)
+		}
+	}
+
+	highlightSidebar, err := os.ReadFile(filepath.Join(sourceDir, "javboss_highlight_sidebar.lua"))
+	if err != nil {
+		t.Fatalf("read JavBoss highlight sidebar: %v", err)
+	}
+	for _, expected := range []string{
+		`mp.register_script_message("toggle", toggle_sidebar)`,
+		`mp.commandv("script-message-to", "javboss_control", "add-highlight")`,
+		`mp.commandv("script-message-to", "javboss_control", "confirm-delete-highlight", tostring(index))`,
+		`mp.commandv("script-message-to", "javboss_control", "rename-highlight", tostring(index))`,
+		`点击跳转 · 右键重命名 · × 删除`,
+	} {
+		if !strings.Contains(string(highlightSidebar), expected) {
+			t.Fatalf("expected highlight sidebar to contain %q", expected)
 		}
 	}
 }
@@ -240,7 +266,7 @@ func TestSessionPathsSharePerProcessRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sessionDir returned error: %v", err)
 	}
-	expected := []string{inputPath, configPath, modernZ.ConfigDir, modernZ.ScriptPath, modernZ.ThumbfastScriptPath, modernZ.PlaylistScriptPath, modernZ.ControlScriptPath}
+	expected := []string{inputPath, configPath, modernZ.ConfigDir, modernZ.ScriptPath, modernZ.ThumbfastScriptPath, modernZ.PlaylistScriptPath, modernZ.ControlScriptPath, modernZ.HighlightSidebarPath}
 	for _, path := range expected {
 		if !strings.HasPrefix(path, root+string(os.PathSeparator)) {
 			t.Fatalf("expected %s to be under isolated mpv session dir %s", path, root)
@@ -253,15 +279,16 @@ func writeModernZTestAssets(t *testing.T) string {
 
 	sourceDir := t.TempDir()
 	files := map[string]string{
-		"modernz.lua":           "-- test lua\n",
-		"modernz.conf":          "layout=modern\n",
-		"modernz-icons.ttf":     "test font",
-		"thumbfast.lua":         "-- thumbfast lua\n",
-		"thumbfast.conf":        "max_height=200\n",
-		"playlist_sidebar.lua":  "-- playlist sidebar lua\n",
-		"playlist_sidebar.conf": "width=280\n",
-		"javboss_control.lua":   "-- javboss control lua\n",
-		"window_geometry.lua":   "-- window geometry lua\n",
+		"modernz.lua":                   "-- test lua\n",
+		"modernz.conf":                  "layout=modern\n",
+		"modernz-icons.ttf":             "test font",
+		"thumbfast.lua":                 "-- thumbfast lua\n",
+		"thumbfast.conf":                "max_height=200\n",
+		"playlist_sidebar.lua":          "-- playlist sidebar lua\n",
+		"playlist_sidebar.conf":         "width=280\n",
+		"javboss_control.lua":           "-- javboss control lua\n",
+		"javboss_highlight_sidebar.lua": "-- javboss highlight sidebar lua\n",
+		"window_geometry.lua":           "-- window geometry lua\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(sourceDir, name), []byte(content), 0o644); err != nil {

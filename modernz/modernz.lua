@@ -230,8 +230,8 @@ local user_opts = {
     chapter_title_mbtn_right_command = "show-text ${chapter-list} 3000",
 
     -- playlist button mouse actions
-    playlist_mbtn_left_command = "script-binding select/select-playlist",
-    playlist_mbtn_right_command = "script-binding select/menu",
+    playlist_mbtn_left_command = "script-message-to playlist_sidebar toggle",
+    playlist_mbtn_right_command = "script-binding select/select-playlist",
 
     -- volume mouse actions
     vol_ctrl_mbtn_left_command = "no-osd cycle mute",
@@ -292,8 +292,8 @@ local user_opts = {
     screenshot_mbtn_left_command = "osd-msg screenshot video",
 
     -- JavBoss highlight button mouse actions
-    highlight_mbtn_left_command = "script-message-to javboss_control add-highlight",
-    highlight_mbtn_right_command = "script-message-to javboss_control manage-highlights",
+    highlight_mbtn_left_command = "script-message-to javboss_highlight_sidebar toggle",
+    highlight_mbtn_right_command = "script-message-to javboss_control add-highlight",
 
     -- JavBoss clip button mouse actions
     clip_mbtn_left_command = "script-message-to javboss_control clip-click",
@@ -425,7 +425,7 @@ local language = {
         unshuffle = "Shuffle playlist off",
         speed_control = "Playback speed",
         screenshot = "Screenshot",
-        highlight = "Add highlight (right click to manage)",
+        highlight = "Toggle highlights (right click to add)",
         clip = "Set clip range (right click for actions)",
         stats_info = "Statistics",
         cache = "Cache",
