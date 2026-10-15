@@ -499,6 +499,7 @@ func buildCommandArgs(path string, options PlayOptions, ipcPath string, startIdl
 		args = append(args, "--vo=x11")
 	}
 	args = append(args, "--load-scripts=no")
+	args = append(args, "--load-console=yes", "--load-select=yes", "--load-stats-overlay=yes")
 	args = append(args, "--include="+mpvConfigPath)
 	if ipcPath != "" {
 		if startIdle {

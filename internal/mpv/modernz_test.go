@@ -81,6 +81,14 @@ func TestBundledModernZEnablesFullscreenAutohide(t *testing.T) {
 		"clip_button=yes\n",
 		"playlist_mbtn_left_command=script-message-to playlist_sidebar toggle\n",
 		"highlight_mbtn_left_command=script-message-to javboss_highlight_sidebar toggle\n",
+		"audio_tracks_button=no\n",
+		"subtitles_button=no\n",
+		"speed_button=no\n",
+		"ontop_button=no\n",
+		"info_button=no\n",
+		"fullscreen_button=no\n",
+		"menu_button=yes\n",
+		"menu_mbtn_left_command=script-message-to javboss_control more-menu\n",
 		"layout=modern-compact\n",
 		"osc_color=#17191F\n",
 		"seekbarfg_color=#0A84FF\n",
@@ -142,7 +150,6 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 	}
 	for _, expected := range []string{
 		`mp.create_osd_overlay("ass-events")`,
-		`mp.set_property_number("video-margin-ratio-right", value)`,
 		`local left = math.max(0, pane_left - math.floor(opts.resize_handle_width / 2))`,
 		`mp.commandv("playlist-play-index", index - 1)`,
 		`publish_width(pane_width * scale_x)`,
@@ -174,6 +181,9 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 			t.Fatalf("expected bundled playlist sidebar script to contain %q", expected)
 		}
 	}
+	if strings.Contains(string(script), `video-margin-ratio-right`) {
+		t.Fatal("playlist sidebar must overlay the video without changing its right margin")
+	}
 	dragCheck := strings.Index(string(script), `if mouse_x and math.abs(mouse_x - pane_left) <= opts.resize_handle_width then`)
 	videoAreaCheck := strings.Index(string(script), `if not mouse_x or mouse_x < pane_left then`)
 	if dragCheck < 0 || videoAreaCheck < 0 || dragCheck >= videoAreaCheck {
@@ -186,8 +196,7 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 	}
 	for _, expected := range []string{
 		`displayresx = 0`,
-		`user-data/javboss/playlist-sidebar-width`,
-		`osc_param.playresx = math.max(1, osc_param.displayresx - sidebar_virtual_width)`,
+		`osc_param.playresx = osc_param.displayresx`,
 		`set_osd(state.osd, osc_param.displayresx, osc_param.playresy, ass.text, 1000)`,
 	} {
 		if !strings.Contains(string(modernZScript), expected) {
@@ -215,6 +224,9 @@ func TestBundledJavBossControlSupportsHighlightsAndBackgroundClips(t *testing.T)
 		`start_seconds = clip_a`,
 		`end_seconds = clip_b`,
 		`剪辑任务已提交到 JavBoss，可关闭播放器`,
+		`mp.register_script_message("more-menu", more_menu)`,
+		`prompt = "更多"`,
+		`prompt = "播放速度"`,
 		`prompt = "确认删除 "`,
 	} {
 		if !strings.Contains(string(control), expected) {
@@ -230,6 +242,7 @@ func TestBundledJavBossControlSupportsHighlightsAndBackgroundClips(t *testing.T)
 		`clip_mbtn_left_command = "script-message-to javboss_control clip-click"`,
 		`new_element("highlight", "button")`,
 		`new_element("clip", "button")`,
+		`new_element("menu", "button")`,
 	} {
 		if !strings.Contains(string(modernZ), expected) {
 			t.Fatalf("expected ModernZ script to contain %q", expected)
@@ -250,6 +263,9 @@ func TestBundledJavBossControlSupportsHighlightsAndBackgroundClips(t *testing.T)
 		if !strings.Contains(string(highlightSidebar), expected) {
 			t.Fatalf("expected highlight sidebar to contain %q", expected)
 		}
+	}
+	if strings.Contains(string(highlightSidebar), `video-margin-ratio-right`) {
+		t.Fatal("highlight sidebar must overlay the video without changing its right margin")
 	}
 }
 

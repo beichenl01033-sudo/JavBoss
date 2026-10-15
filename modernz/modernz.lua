@@ -110,6 +110,7 @@ local user_opts = {
     fullscreen_button = true,              -- show fullscreen toggle button
     info_button = true,                    -- show info button
     ontop_button = true,                   -- show window on top button
+    menu_button = true,                    -- show overflow menu button
     ontop_in_topbar = false,               -- move ontop button to top bar when ontop is active
     screenshot_button = true,              -- show screenshot button
     highlight_button = true,               -- show JavBoss highlight button
@@ -284,6 +285,9 @@ local user_opts = {
 
     -- info button mouse actions
     info_mbtn_left_command = "script-binding stats/display-page-1-toggle",
+
+    -- overflow menu button mouse actions
+    menu_mbtn_left_command = "script-message-to javboss_control more-menu",
 
     -- ontop (pin) button mouse actions
     ontop_mbtn_left_command = "osd-msg cycle ontop",
@@ -2414,7 +2418,8 @@ layouts["modern"] = function ()
         end_x = end_x - 45
     end
 
-    if user_opts.fullscreen_button then right_side_button("fullscreen", 550) end
+    if user_opts.menu_button then right_side_button("menu", 550) end
+    if user_opts.fullscreen_button then right_side_button("fullscreen", 600) end
     if user_opts.info_button then right_side_button("info", 650) end
     if ontop_button then right_side_button("ontop", 750) end
     if user_opts.highlight_button then right_side_button("highlight", 800, osc_styles.control_text) end
@@ -2653,7 +2658,8 @@ layouts["modern-compact"] = function ()
         end
     end
 
-    right_side_button("fullscreen", 250, user_opts.fullscreen_button)
+    right_side_button("menu", 250, user_opts.menu_button)
+    right_side_button("fullscreen", 300, user_opts.fullscreen_button)
     right_side_button("ontop", 300, user_opts.ontop_button and not (window_controls_enabled() and user_opts.ontop_in_topbar and state.ontop))
     right_side_button("sub_track", 400, user_opts.subtitles_button and state.sub_track_count > 0)
     right_side_button("audio_track", 500, user_opts.audio_tracks_button and state.audio_track_count > 0)
@@ -2706,6 +2712,7 @@ layouts["modern-image"] = function ()
     local track_nextprev_buttons = user_opts.track_nextprev_buttons and state.playlist_count > 1
     local fullscreen_button = user_opts.fullscreen_button
     local info_button = user_opts.info_button
+    local menu_button = user_opts.menu_button
     local ontop_button = user_opts.ontop_button and not (window_controls_enabled() and user_opts.ontop_in_topbar and state.ontop)
     local playlist_button = user_opts.playlist_button and (not user_opts.hide_empty_playlist_button or state.playlist_count > 1)
     local zoom_control = user_opts.zoom_control
@@ -2762,6 +2769,7 @@ layouts["modern-image"] = function ()
     end
 
     -- right side
+    if menu_button then right_side_button("menu", 350) end
     if fullscreen_button then right_side_button("fullscreen", 350) end
     if info_button then right_side_button("info", 400) end
     if ontop_button then right_side_button("ontop", 450) end
@@ -2875,13 +2883,7 @@ local function osc_init()
         osc_param.display_aspect = display_aspect
     end
     osc_param.displayresx = osc_param.playresy * osc_param.display_aspect
-    local display_w = select(1, mp.get_osd_size())
-    local sidebar_width = mp.get_property_number("user-data/javboss/playlist-sidebar-width", 0) or 0
-    local sidebar_virtual_width = 0
-    if display_w and display_w > 0 and sidebar_width > 0 then
-        sidebar_virtual_width = sidebar_width * osc_param.displayresx / display_w
-    end
-    osc_param.playresx = math.max(1, osc_param.displayresx - sidebar_virtual_width)
+    osc_param.playresx = osc_param.displayresx
 
     -- stop seeking with the slider to prevent skipping files
     state.active_element = nil
@@ -3161,6 +3163,12 @@ local function osc_init()
     ne.content = icons.info
     ne.tooltipF = locale.stats_info
     bind_buttons("info")
+
+    --overflow menu
+    ne = new_element("menu", "button")
+    ne.content = icons.menu
+    ne.tooltipF = locale.menu
+    bind_buttons("menu")
 
     --ontop
     ne = new_element("ontop", "button")
@@ -3884,7 +3892,6 @@ mp.register_event("start-file", request_init)
 mp.observe_property("track-list", "native", update_tracklist)
 observe_cached("playlist-count", request_init)
 observe_cached("playlist-pos", request_init)
-mp.observe_property("user-data/javboss/playlist-sidebar-width", "number", request_init_resize)
 observe_cached("chapter-list", function ()
     state.chapter_list = state.chapter_list or {}
     table.sort(state.chapter_list, function(a, b) return a.time < b.time end)
