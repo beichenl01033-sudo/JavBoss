@@ -206,6 +206,9 @@ func TestBundledJavBossControlSupportsHighlightsAndLosslessClips(t *testing.T) {
 		`utils.join_path(video_dir, "highlights.json")`,
 		`".javboss-clip-"`,
 		`"-c", "copy"`,
+		`args = { "touch", "-m", "-r", source, output }`,
+		`"$target.LastWriteTimeUtc = $source.LastWriteTimeUtc"`,
+		`local timestamp_copied = copy_modified_time(source, output)`,
 		`prompt = "确认删除 "`,
 	} {
 		if !strings.Contains(string(control), expected) {

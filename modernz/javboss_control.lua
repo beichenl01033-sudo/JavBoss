@@ -299,6 +299,33 @@ local function next_output_path(path, start_time, end_time)
     return candidate, extension
 end
 
+local function copy_modified_time(source, output)
+    local args
+    if package.config:sub(1, 1) == "\\" then
+        args = {
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$source = Get-Item -LiteralPath $args[0]; " ..
+                "$target = Get-Item -LiteralPath $args[1]; " ..
+                "$target.LastWriteTimeUtc = $source.LastWriteTimeUtc",
+            source,
+            output,
+        }
+    else
+        args = { "touch", "-m", "-r", source, output }
+    end
+
+    local result = utils.subprocess({ args = args, cancellable = false })
+    if not result or result.status ~= 0 then
+        local reason = result and (result.error_string or result.stderr) or "unknown error"
+        mp.msg.error("copy clip modified time failed: " .. tostring(reason))
+        return false
+    end
+    return true
+end
+
 local function export_clip()
     if export_running then
         osd("剪辑正在导出")
@@ -354,8 +381,13 @@ local function export_clip()
             osd("剪辑文件保存失败")
             return
         end
+        local timestamp_copied = copy_modified_time(source, output)
         clear_clip(false)
-        osd("剪辑已保存：" .. select(2, utils.split_path(output)), 5)
+        if timestamp_copied then
+            osd("剪辑已保存：" .. select(2, utils.split_path(output)), 5)
+        else
+            osd("剪辑已保存，但未能同步源文件修改时间", 5)
+        end
     end)
 end
 
