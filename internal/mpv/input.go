@@ -444,7 +444,7 @@ func buildConfigContent() (string, error) {
 		"watch-later-options-remove=sub-pos,osd-margin-y",
 	}
 	if runtime.GOOS == "darwin" {
-		lines = append(lines, "border=no")
+		lines = append(lines, "border=yes", "title-bar=yes")
 	}
 	lines = append(lines,
 		"auto-window-resize=no",

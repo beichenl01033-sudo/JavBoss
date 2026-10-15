@@ -61,6 +61,14 @@ func TestBuildConfigContentIncludesRequiredDefaults(t *testing.T) {
 	if !strings.Contains(content, "geometry=80%x80%+50%+50%\n") {
 		t.Fatalf("expected centered default geometry in mpv config, got %q", content)
 	}
+	if runtime.GOOS == "darwin" {
+		if !strings.Contains(content, "border=yes\n") || !strings.Contains(content, "title-bar=yes\n") {
+			t.Fatalf("expected native macOS window controls in mpv config, got %q", content)
+		}
+		if strings.Contains(content, "border=no\n") {
+			t.Fatalf("macOS mpv config must not hide the native title bar: %q", content)
+		}
+	}
 }
 
 func TestBuildInputConfContentIncludesDefaultScreenshotKey(t *testing.T) {
