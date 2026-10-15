@@ -2589,8 +2589,10 @@ layouts["modern-compact"] = function ()
     local pl_pos = state.playlist_pos + 1
 
     if user_opts.track_nextprev_buttons then
-        local prev_vis = pl_pos > 1 and osc_param.playresx >= 300
+        local navigation_visible = pl_count > 1
+        local prev_vis = navigation_visible and osc_param.playresx >= 300
         elements["playlist_prev"].visible = prev_vis
+        elements["playlist_prev"].enabled = pl_pos > 1
         if prev_vis then
             lo = add_layout("playlist_prev")
             lo.geometry = {x = start_x, y = refY - (user_opts.osc_height / 2), an = 5, w = 24, h = 24}
@@ -2598,8 +2600,9 @@ layouts["modern-compact"] = function ()
             start_x = start_x + 55
         end
 
-        local next_vis = pl_pos < pl_count and osc_param.playresx >= 400
+        local next_vis = navigation_visible and osc_param.playresx >= 400
         elements["playlist_next"].visible = next_vis
+        elements["playlist_next"].enabled = pl_pos < pl_count
         if next_vis then
             lo = add_layout("playlist_next")
             lo.geometry = {x = start_x, y = refY - (user_opts.osc_height / 2), an = 5, w = 24, h = 24}
