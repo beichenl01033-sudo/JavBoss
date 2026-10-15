@@ -305,7 +305,7 @@ function JavListRoute({
       javTitleMaxRows={javTitleMaxRows}
       javIdolTagMaxRows={javIdolTagMaxRows}
       javTagMaxRows={javTagMaxRows}
-      onPlay={onPlay}
+      onPlay={(video, item) => onPlay?.(video, item, javItems)}
       onOpenFile={onOpenFile}
       openFileLabel={alternatePlayerLabel}
       onRevealFile={onRevealFile}

@@ -164,6 +164,7 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
             tagMaxRows={javTagMaxRows}
             buildJavUrl={buildJavUrl}
             {...actions}
+            onPlay={(video, item) => actions?.onPlay?.(video, item, items)}
           />
         )}
       </div>

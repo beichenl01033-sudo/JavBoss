@@ -43,7 +43,7 @@ func TestPlaylistIPCAndScreenshotRoutingWithMPV(t *testing.T) {
 		index := i
 		items[i] = PlaylistItem{Path: imageA, Title: "中文视频 " + strconv.Itoa(i+1), Options: PlayOptions{DataDir: dir, VideoID: int64(i + 1)}, OnStarted: func() { started <- index }}
 	}
-	if err := playPlaylistInNewProcess(items); err != nil {
+	if err := playPlaylistInNewProcess(items, 0); err != nil {
 		t.Fatal(err)
 	}
 	args, err := os.ReadFile(argsPath)
@@ -95,7 +95,7 @@ func TestPlaylistIPCAndScreenshotRoutingWithMPV(t *testing.T) {
 	for i := range secondItems {
 		secondItems[i].OnStarted = nil
 	}
-	if err := playPlaylistInNewProcess(secondItems); err != nil {
+	if err := playPlaylistInNewProcess(secondItems, 0); err != nil {
 		t.Fatal(err)
 	}
 	secondArgs, err := os.ReadFile(argsPath)

@@ -31,9 +31,11 @@ export default function usePlayback({ showCenterToast, showToast }) {
   const [playerIndex, setPlayerIndex] = useState(0)
   const [playerStartTime, setPlayerStartTime] = useState(null)
   const playerVideo = playerPlaylist[playerIndex] || null
-  const openBrowserPlaylist = useCallback((items, startTime = null) => {
+  const openBrowserPlaylist = useCallback((items, startTime = null, startIndex = 0) => {
     setPlayerPlaylist(items)
-    setPlayerIndex(0)
+    setPlayerIndex(
+      Number.isInteger(startIndex) && startIndex >= 0 && startIndex < items.length ? startIndex : 0
+    )
     setPlayerStartTime(startTime)
   }, [])
   const closePlayer = useCallback(() => openBrowserPlaylist([]), [openBrowserPlaylist])
@@ -315,7 +317,7 @@ export default function usePlayback({ showCenterToast, showToast }) {
   }, [])
 
   const playVideos = useCallback(
-    async (items, player = defaultPlayer) => {
+    async (items, player = defaultPlayer, startIndex = 0, { announce = true } = {}) => {
       if (!ensurePlaylistAvailable(player)) return
       const list = Array.isArray(items) ? items : []
       const targets = list
@@ -341,20 +343,60 @@ export default function usePlayback({ showCenterToast, showToast }) {
       }
       if (!confirmLargePlaylist(targets.length)) return
 
+      const normalizedStartIndex =
+        Number.isInteger(startIndex) && startIndex >= 0 && startIndex < targets.length
+          ? startIndex
+          : 0
+
       if (player === 'browser') {
-        openBrowserPlaylist(list)
+        openBrowserPlaylist(list, null, normalizedStartIndex)
         return true
       }
-      const result = await playVideoPlaylist(targets, player)
+      const result = await playVideoPlaylist(targets, player, normalizedStartIndex)
       const count = Number(result?.count) || targets.length
-      showToast(zh(`已将 ${count} 个视频加入播放列表`, `Added ${count} videos to the playlist`))
+      if (announce) {
+        showToast(zh(`已将 ${count} 个视频加入播放列表`, `Added ${count} videos to the playlist`))
+      }
       return true
     },
     [defaultPlayer, ensurePlaylistAvailable, openBrowserPlaylist, showCenterToast, showToast]
   )
 
+  const playVideoQueue = useCallback(
+    async (items, selectedVideo, player = defaultPlayer) => {
+      const source = Array.isArray(items) ? items : []
+      const queue = source.map((item) => getVideoLocationChoices(item)[0] || null).filter(Boolean)
+      if (queue.length <= 1 || player === 'system') {
+        handleOpenPlayer(selectedVideo)
+        return
+      }
+      const selectedID = Number(selectedVideo?.id)
+      const selectedLocationID = Number(selectedVideo?.location_id || 0)
+      let startIndex = queue.findIndex(
+        (item) =>
+          Number(item?.id) === selectedID &&
+          (!selectedLocationID || Number(item?.location_id || 0) === selectedLocationID)
+      )
+      if (startIndex < 0) {
+        startIndex = queue.findIndex((item) => Number(item?.id) === selectedID)
+      }
+      if (startIndex < 0) startIndex = 0
+      await playVideos(queue, player, startIndex, { announce: false })
+    },
+    [defaultPlayer, getVideoLocationChoices, handleOpenPlayer, playVideos]
+  )
+
   const handleJavPlay = useCallback(
-    (video, item) => {
+    (video, item, visibleItems = []) => {
+      const visibleVideos = (Array.isArray(visibleItems) ? visibleItems : [])
+        .map((entry) => (Array.isArray(entry?.videos) ? entry.videos[0] : null))
+        .filter(Boolean)
+      if (visibleVideos.length > 1) {
+        playVideoQueue(visibleVideos, video).catch((err) => {
+          showCenterToast(getErrorMessage(err))
+        })
+        return
+      }
       const videos = item?.videos || []
       if (videos.length > 1) {
         playVideos(videos).catch((err) => {
@@ -367,7 +409,7 @@ export default function usePlayback({ showCenterToast, showToast }) {
         handleOpenPlayer(target)
       }
     },
-    [playVideos, showCenterToast, handleOpenPlayer]
+    [playVideoQueue, playVideos, showCenterToast, handleOpenPlayer]
   )
 
   const handleJavOpenFile = useCallback(
@@ -638,6 +680,7 @@ export default function usePlayback({ showCenterToast, showToast }) {
     handleRevealVideoFile,
     closeJavVideoPicker,
     playVideos,
+    playVideoQueue,
     handleJavPlay,
     handleJavOpenFile,
     handleJavRevealFile,

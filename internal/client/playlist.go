@@ -21,12 +21,17 @@ func (c *Client) handlePlaylist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request struct {
-		Player string        `json:"player"`
-		Items  []playRequest `json:"items"`
+		Player     string        `json:"player"`
+		Items      []playRequest `json:"items"`
+		StartIndex int           `json:"start_index"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxClientRequestBody))
 	if err := decoder.Decode(&request); err != nil || len(request.Items) == 0 {
 		respondJSONError(w, http.StatusBadRequest, "播放列表请求无效", "Invalid playlist request")
+		return
+	}
+	if request.StartIndex < 0 || request.StartIndex >= len(request.Items) {
+		respondJSONError(w, http.StatusBadRequest, "播放列表起始位置无效", "Invalid playlist start index")
 		return
 	}
 	if request.Player != "" && request.Player != "mpv" {
@@ -88,7 +93,7 @@ func (c *Client) handlePlaylist(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	}
-	if err := c.playPlaylist(items); err != nil {
+	if err := c.playPlaylist(items, request.StartIndex); err != nil {
 		logging.Error("client MPV playlist failed: %v", err)
 		respondJSONError(w, http.StatusInternalServerError, "使用本机 MPV 播放列表失败", "Could not play the playlist with local MPV")
 		return

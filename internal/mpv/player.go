@@ -18,6 +18,7 @@ import (
 
 	"javboss/internal/common/logging"
 	"javboss/internal/playback"
+	"javboss/internal/util"
 )
 
 const playbackScreenshotTemplate = "mpv_%wH-%wM-%wS.%wT"
@@ -96,8 +97,16 @@ func PlayVideo(path string, options PlayOptions) error {
 
 // PlayPlaylist opens the files in one MPV window in the order provided.
 func PlayPlaylist(items []PlaylistItem) error {
+	return PlayPlaylistFrom(items, 0)
+}
+
+// PlayPlaylistFrom opens the files in one MPV window and starts at startIndex.
+func PlayPlaylistFrom(items []PlaylistItem, startIndex int) error {
 	if len(items) == 0 {
 		return errors.New("playlist is empty")
+	}
+	if startIndex < 0 || startIndex >= len(items) {
+		return errors.New("playlist start index is out of range")
 	}
 	for _, item := range items {
 		if strings.TrimSpace(item.Path) == "" {
@@ -108,9 +117,9 @@ func PlayPlaylist(items []PlaylistItem) error {
 	cancelFocusRestoreAttempts()
 	rememberFocusRestoreOwner(0)
 	if !loadConfiguredPlayerReuseWindow() {
-		return playPlaylistInNewProcess(items)
+		return playPlaylistInNewProcess(items, startIndex)
 	}
-	return defaultSession.PlayPlaylist(items)
+	return defaultSession.PlayPlaylistFrom(items, startIndex)
 }
 
 func ResetPlayerSession() {
@@ -130,7 +139,7 @@ func playVideoInNewProcess(path string, options PlayOptions) error {
 	return nil
 }
 
-func playPlaylistInNewProcess(items []PlaylistItem) error {
+func playPlaylistInNewProcess(items []PlaylistItem, startIndex int) error {
 	// Each launch owns its own IPC session, independent of the reusable player.
 	s := &playerSession{}
 	s.mu.Lock()
@@ -140,7 +149,7 @@ func playPlaylistInNewProcess(items []PlaylistItem) error {
 	if err := s.ensureRunningLocked(baseOptions); err != nil {
 		return err
 	}
-	if err := s.playPlaylistLocked(items); err != nil {
+	if err := s.playPlaylistLocked(items, startIndex); err != nil {
 		s.stopLocked()
 		return err
 	}
@@ -183,6 +192,10 @@ func (s *playerSession) PlayVideo(path string, options PlayOptions) error {
 }
 
 func (s *playerSession) PlayPlaylist(items []PlaylistItem) error {
+	return s.PlayPlaylistFrom(items, 0)
+}
+
+func (s *playerSession) PlayPlaylistFrom(items []PlaylistItem, startIndex int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -191,7 +204,7 @@ func (s *playerSession) PlayPlaylist(items []PlaylistItem) error {
 		if err := s.ensureRunningLocked(items[0].Options); err != nil {
 			return err
 		}
-		if err := s.playPlaylistLocked(items); err != nil {
+		if err := s.playPlaylistLocked(items, startIndex); err != nil {
 			lastErr = err
 			if isIPCResponseError(err) {
 				return err
@@ -337,7 +350,10 @@ func (s *playerSession) playVideoLocked(path string, options PlayOptions) error 
 	return nil
 }
 
-func (s *playerSession) playPlaylistLocked(items []PlaylistItem) error {
+func (s *playerSession) playPlaylistLocked(items []PlaylistItem, startIndex int) error {
+	if startIndex < 0 || startIndex >= len(items) {
+		return errors.New("playlist start index is out of range")
+	}
 	commands, err := buildBeforeLoadCommands(items[0].Options)
 	if err != nil {
 		return err
@@ -395,7 +411,7 @@ func (s *playerSession) playPlaylistLocked(items []PlaylistItem) error {
 	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-titles", titles}); err != nil {
 		return err
 	}
-	if err := runIPCCommand(s.ipcPath, []any{"playlist-play-index", 0}); err != nil {
+	if err := runIPCCommand(s.ipcPath, []any{"playlist-play-index", startIndex}); err != nil {
 		return err
 	}
 	if !shouldRestoreWindowBeforeLoad() {
@@ -474,6 +490,10 @@ func buildCommandArgs(path string, options PlayOptions, ipcPath string, startIdl
 	args = append(args, "--script="+modernZ.ScriptPath)
 	args = append(args, "--script="+modernZ.ThumbfastScriptPath)
 	args = append(args, "--script="+modernZ.PlaylistScriptPath)
+	args = append(args, "--script="+modernZ.ControlScriptPath)
+	if ffmpegPath, resolveErr := util.ResolveFFmpegPath(); resolveErr == nil {
+		args = append(args, "--script-opt=javboss_control-ffmpeg_path="+ffmpegPath)
+	}
 	if runtime.GOOS == "darwin" {
 		args = append(args, "--script="+modernZ.WindowGeometryScriptPath)
 	}
