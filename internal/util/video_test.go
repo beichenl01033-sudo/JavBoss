@@ -86,6 +86,10 @@ func TestIsVideoCandidateUsesKnownExtensionWithoutAcceptingText(t *testing.T) {
 	if !IsVideoCandidate(ogvPath) {
 		t.Fatal("known video extension should be accepted as an ffprobe candidate")
 	}
+	clipPath := filepath.Join(dir, "ABC-123.javboss-clip-00h01m00s-00h02m00s.mp4")
+	if !IsVideoCandidate(clipPath) {
+		t.Fatal("JavBoss lossless clips should remain scan candidates")
+	}
 
 	textPath := filepath.Join(dir, "sample.txt")
 	if err := os.WriteFile(textPath, []byte("ordinary text"), 0o600); err != nil {

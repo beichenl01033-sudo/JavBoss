@@ -46,7 +46,7 @@ func TestShutdownAllPlaybackModesWithMPV(t *testing.T) {
 	if err := playVideoInNewProcess(image, options); err != nil {
 		t.Fatal(err)
 	}
-	if err := playPlaylistInNewProcess([]PlaylistItem{{Path: image, Options: options}}); err != nil {
+	if err := playPlaylistInNewProcess([]PlaylistItem{{Path: image, Options: options}}, 0); err != nil {
 		t.Fatal(err)
 	}
 	playerProcesses.mu.Lock()

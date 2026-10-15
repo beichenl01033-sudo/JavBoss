@@ -298,6 +298,7 @@ export default function App() {
     handleRevealVideoFile,
     closeJavVideoPicker,
     playVideos,
+    playVideoQueue,
     handleJavPlay,
     handleJavOpenFile,
     handleJavRevealFile,
@@ -712,7 +713,7 @@ export default function App() {
                 videoBulkActionBusy={videoBulkActionBusy}
                 selectionPlaying={selectionPlaying}
                 bulkPlaybackEnabled={bulkPlaybackEnabled}
-                handleOpenPlayer={handleOpenPlayer}
+                handlePlayVideoQueue={playVideoQueue}
                 containerMode={containerMode}
                 alternatePlayer={alternatePlayer}
                 handleOpenAlternatePlayer={handleOpenAlternatePlayer}

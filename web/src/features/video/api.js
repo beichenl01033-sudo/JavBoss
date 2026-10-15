@@ -58,11 +58,11 @@ export async function playVideoFile({ id, locationId, path, dirPath, startTime }
   }
 }
 
-export async function playVideoPlaylist(items, player = 'mpv') {
+export async function playVideoPlaylist(items, player = 'mpv', startIndex = 0) {
   const res = await apiFetch('/videos/playlist', {
     method: 'POST',
     headers: jsonHeaders,
-    body: JSON.stringify({ items, player }),
+    body: JSON.stringify({ items, player, start_index: startIndex }),
   })
   if (!res.ok) {
     throw await apiError(res)

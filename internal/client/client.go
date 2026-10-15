@@ -23,12 +23,13 @@ import (
 const maxClientRequestBody = 1 << 20
 
 type Options struct {
-	BaseDir      string
-	LocalBaseURL string
-	RemoteURL    string
-	Transport    http.RoundTripper
-	PlayVideo    func(path string, options mpv.PlayOptions) error
-	PlayPlaylist func(items []mpv.PlaylistItem) error
+	BaseDir          string
+	LocalBaseURL     string
+	RemoteURL        string
+	Transport        http.RoundTripper
+	PlayVideo        func(path string, options mpv.PlayOptions) error
+	PlayPlaylist     func(items []mpv.PlaylistItem) error
+	PlayPlaylistFrom func(items []mpv.PlaylistItem, startIndex int) error
 }
 
 type remoteState struct {
@@ -41,7 +42,7 @@ type Client struct {
 	localBaseURL string
 	transport    http.RoundTripper
 	playVideo    func(path string, options mpv.PlayOptions) error
-	playPlaylist func(items []mpv.PlaylistItem) error
+	playPlaylist func(items []mpv.PlaylistItem, startIndex int) error
 	settings     *settingsStore
 
 	remoteMu sync.RWMutex
@@ -92,9 +93,14 @@ func New(options Options) (*Client, error) {
 	if playVideo == nil {
 		playVideo = mpv.PlayVideo
 	}
-	playPlaylist := options.PlayPlaylist
+	playPlaylist := options.PlayPlaylistFrom
+	if playPlaylist == nil && options.PlayPlaylist != nil {
+		playPlaylist = func(items []mpv.PlaylistItem, _ int) error {
+			return options.PlayPlaylist(items)
+		}
+	}
 	if playPlaylist == nil {
-		playPlaylist = mpv.PlayPlaylist
+		playPlaylist = mpv.PlayPlaylistFrom
 	}
 	settings, err := loadSettingsStore(options.BaseDir)
 	if err != nil {

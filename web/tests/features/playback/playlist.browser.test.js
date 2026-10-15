@@ -432,6 +432,18 @@ test(
       )
       assert.equal(await evaluate(`Boolean(${playlist})`), false)
     }
+
+    await evaluate(
+      `window.testStore.setState(state => ({config:{...state.config, default_player:'mpv', mpv_enabled:'true', runtime_remote_request:'false', runtime_container:'false'}}))`
+    )
+    await evaluate(
+      `document.querySelectorAll('.video-card')[1].querySelector('button[aria-label="Play"]').click()`
+    )
+    await waitFor(`window.playlistRequests.at(-1)?.start_index === 1`)
+    assert.deepEqual(
+      await evaluate('window.playlistRequests.at(-1).items.map(item => item.location_id)'),
+      [11, 12, 13]
+    )
     await evaluate(`{
       window.testStore.setState(state => ({config:{...state.config, default_player:'browser', mpv_enabled:'false'}}));
       const previousFetch = window.fetch;

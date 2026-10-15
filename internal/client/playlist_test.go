@@ -38,17 +38,22 @@ func TestPlaylistPlaysLocalGrantsAndStartsScreenshotSync(t *testing.T) {
 	defer remote.Close()
 	c := newTestClient(t, remote.URL, nil)
 	var played []mpv.PlaylistItem
-	c.playPlaylist = func(items []mpv.PlaylistItem) error {
+	playedStartIndex := -1
+	c.playPlaylist = func(items []mpv.PlaylistItem, startIndex int) error {
 		played = items
+		playedStartIndex = startIndex
 		return nil
 	}
-	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/videos/playlist", strings.NewReader(`{"items":[{"video_id":42,"location_id":7,"start_time":12.5,"title":"中文 {测试}.mp4"},{"video_id":43,"location_id":8}]}`))
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/videos/playlist", strings.NewReader(`{"start_index":1,"items":[{"video_id":42,"location_id":7,"start_time":12.5,"title":"中文 {测试}.mp4"},{"video_id":43,"location_id":8}]}`))
 	req.Header.Set("Cookie", "session=secret")
 	req.Header.Set("Sec-Fetch-Site", "same-origin")
 	w := httptest.NewRecorder()
 	c.ServeHTTP(w, req)
 	if w.Code != http.StatusOK || len(played) != 2 || !strings.Contains(w.Body.String(), `"count":2`) {
 		t.Fatalf("response=%d %s, played=%v", w.Code, w.Body.String(), played)
+	}
+	if playedStartIndex != 1 {
+		t.Fatalf("start index=%d, want 1", playedStartIndex)
 	}
 	for i, item := range played {
 		if item.Options.VideoID != int64(42+i) || !item.Options.EnableNetworkThumbnail {
@@ -99,7 +104,7 @@ func TestPlaylistRejectsInvalidOrUnavailableFilesBeforeLocalPlayback(t *testing.
 	}))
 	defer remote.Close()
 	c := newTestClient(t, remote.URL, nil)
-	c.playPlaylist = func([]mpv.PlaylistItem) error {
+	c.playPlaylist = func([]mpv.PlaylistItem, int) error {
 		t.Error("invalid playlist started local playback")
 		return nil
 	}
@@ -109,6 +114,7 @@ func TestPlaylistRejectsInvalidOrUnavailableFilesBeforeLocalPlayback(t *testing.
 	}{
 		{"unsupported player", `{"player":"system","items":[{"video_id":42}]}`, "session=x", "", "POST", 400},
 		{"empty", `{"items":[]}`, "session=x", "", "POST", 400},
+		{"invalid start index", `{"start_index":1,"items":[{"video_id":42}]}`, "session=x", "", "POST", 400},
 		{"invalid ID", `{"items":[{"video_id":0}]}`, "session=x", "", "POST", 400},
 		{"missing login", `{"items":[{"video_id":42}]}`, "", "", "POST", 401},
 		{"missing media", `{"items":[{"video_id":42,"location_id":7}]}`, "session=x", "", "POST", 404},

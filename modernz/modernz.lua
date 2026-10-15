@@ -112,6 +112,8 @@ local user_opts = {
     ontop_button = true,                   -- show window on top button
     ontop_in_topbar = false,               -- move ontop button to top bar when ontop is active
     screenshot_button = true,              -- show screenshot button
+    highlight_button = true,               -- show JavBoss highlight button
+    clip_button = true,                    -- show JavBoss lossless clip button
 
     download_button = true,                -- show download button on web videos (requires yt-dlp and ffmpeg)
     download_path = "~~desktop/mpv",       -- default download directory for videos (https://mpv.io/manual/master/#paths)
@@ -289,6 +291,14 @@ local user_opts = {
     -- screenshot button mouse actions
     screenshot_mbtn_left_command = "osd-msg screenshot video",
 
+    -- JavBoss highlight button mouse actions
+    highlight_mbtn_left_command = "script-message-to javboss_control add-highlight",
+    highlight_mbtn_right_command = "script-message-to javboss_control manage-highlights",
+
+    -- JavBoss clip button mouse actions
+    clip_mbtn_left_command = "script-message-to javboss_control clip-click",
+    clip_mbtn_right_command = "script-message-to javboss_control clip-menu",
+
     -- loop file button mouse actions
     file_loop_mbtn_left_command = "osd-msg cycle-values loop-file inf no",
     file_loop_mbtn_right_command = "osd-msg cycle-values loop-playlist inf no",
@@ -369,6 +379,9 @@ local function build_icons(theme_name, style)
         loop_on         = o("repeat_on"),
         loop_off        = o("repeat"),
         screenshot      = o("photo_camera"),
+        highlight       = "☆",
+        highlight_on    = "★",
+        clip            = "✂",
         ontop_on        = o("pip"),
         ontop_off       = o("pip_exit"),
         info            = o("info"),
@@ -412,6 +425,8 @@ local language = {
         unshuffle = "Shuffle playlist off",
         speed_control = "Playback speed",
         screenshot = "Screenshot",
+        highlight = "Add highlight (right click to manage)",
+        clip = "Set clip range (right click for actions)",
         stats_info = "Statistics",
         cache = "Cache",
         buffering = "Buffering",
@@ -562,6 +577,7 @@ local function set_osc_styles()
         control_1 = "{\\1c&H" .. osc_color_convert(user_opts.playpause_color) .. "&\\fs" .. playpause_size .. "\\fn" .. icons.iconfont .. "}",
         control_2 = "{\\1c&H" .. osc_color_convert(user_opts.middle_buttons_color) .. "&\\fs" .. midbuttons_size .. "\\fn" .. icons.iconfont .. "}",
         control_3 = "{\\1c&H" .. osc_color_convert(user_opts.side_buttons_color) .. "&\\fs" .. sidebuttons_size .. "\\fn" .. icons.iconfont .. "}",
+        control_text = "{\\1c&H" .. osc_color_convert(user_opts.side_buttons_color) .. "&\\fs" .. sidebuttons_size .. "\\fn" .. user_opts.font .. "}",
         element_down = "{\\1c&H" .. osc_color_convert(user_opts.held_element_color) .. "&" .. string.format("\\fscx%s\\fscy%s", user_opts.button_held_size, user_opts.button_held_size) .. "}",
         element_hover = "{" .. (hover_effects.color and "\\1c&H" .. osc_color_convert(user_opts.hover_effect_color) .. "&" or "") .. (hover_effects.size and string.format("\\fscx%s\\fscy%s", user_opts.button_hover_size, user_opts.button_hover_size) or "") .. "}",
         hover_bg = "{\\1c&H" .. osc_color_convert(user_opts.hover_effect_color) .. "&}",
@@ -1334,7 +1350,7 @@ local function collect_gap_cuts(element)
     local cuts = {}
     if element.slider.markerF then
         for n, marker in ipairs(element.slider.markerF()) do
-            if n > 1 and marker >= element.slider.min.value and marker <= element.slider.max.value then
+            if (n > 1 or marker > 0) and marker >= element.slider.min.value and marker <= element.slider.max.value then
                 cuts[#cuts + 1] = get_slider_ele_pos_for(element, marker)
             end
         end
@@ -1487,7 +1503,7 @@ local function draw_seekbar_nibbles(element, elem_ass)
     -- draw non-current chapter nibbles
     local has_non_current = false
     for n, marker in ipairs(markers) do
-        if n > 1 and (n - 1) ~= current_chapter and marker >= element.slider.min.value and marker <= element.slider.max.value then
+        if (n > 1 or marker > 0) and (n - 1) ~= current_chapter and marker >= element.slider.min.value and marker <= element.slider.max.value then
             if not has_non_current then
                 begin_draw_layer(element, elem_ass, user_opts.nibble_color)
                 has_non_current = true
@@ -1497,9 +1513,9 @@ local function draw_seekbar_nibbles(element, elem_ass)
     end
 
     -- draw current chapter nibble on top
-    if current_chapter > 0 and current_chapter < #markers then
+    if current_chapter >= 0 and current_chapter < #markers then
         local marker = markers[current_chapter + 1]
-        if marker >= element.slider.min.value and marker <= element.slider.max.value then
+        if (current_chapter > 0 or marker > 0) and marker >= element.slider.min.value and marker <= element.slider.max.value then
             begin_draw_layer(element, elem_ass, user_opts.nibble_current_color)
             draw_nibble(elem_ass, get_slider_ele_pos_for(element, marker))
         end
@@ -2388,7 +2404,7 @@ layouts["modern"] = function ()
     lo.alpha[3] = 0
     lo.style = osc_styles.time
 
-    -- fullscreen - info - pin - screenshot - loop - shuffle - speed - download - cache
+    -- fullscreen - info - pin - JavBoss controls - screenshot - loop - shuffle - speed - download - cache
     local end_x = osc_geo.w - 37
     local function right_side_button(name, min_w, style, w)
         elements[name].visible = (osc_param.playresx >= min_w - outeroffset)
@@ -2401,11 +2417,13 @@ layouts["modern"] = function ()
     if user_opts.fullscreen_button then right_side_button("fullscreen", 550) end
     if user_opts.info_button then right_side_button("info", 650) end
     if ontop_button then right_side_button("ontop", 750) end
-    if user_opts.screenshot_button then right_side_button("screenshot", 850) end
-    if user_opts.loop_button then right_side_button("file_loop", 950) end
-    if user_opts.shuffle_button then right_side_button("shuffle", 1050) end
-    if user_opts.speed_button then right_side_button("speed", 1150, osc_styles.speed, 42) end
-    if user_opts.download_button and state.is_URL then right_side_button("download", 1150) end
+    if user_opts.highlight_button then right_side_button("highlight", 800, osc_styles.control_text) end
+    if user_opts.clip_button and not state.is_URL then right_side_button("clip", 850, osc_styles.control_text) end
+    if user_opts.screenshot_button then right_side_button("screenshot", 950) end
+    if user_opts.loop_button then right_side_button("file_loop", 1050) end
+    if user_opts.shuffle_button then right_side_button("shuffle", 1150) end
+    if user_opts.speed_button then right_side_button("speed", 1250, osc_styles.speed, 42) end
+    if user_opts.download_button and state.is_URL then right_side_button("download", 1250) end
 
     if user_opts.cache_info then
         right_side_button("cache_info", 1250, osc_styles.cache, user_opts.cache_info_speed and 70 or 45)
@@ -2640,8 +2658,10 @@ layouts["modern-compact"] = function ()
     right_side_button("sub_track", 400, user_opts.subtitles_button and state.sub_track_count > 0)
     right_side_button("audio_track", 500, user_opts.audio_tracks_button and state.audio_track_count > 0)
     right_side_button("playlist", 600, user_opts.playlist_button)
-    right_side_button("download", 700, state.is_URL and user_opts.download_button)
-    right_side_button("speed", 700, user_opts.speed_button, osc_styles.speed, 42)
+    right_side_button("highlight", 650, user_opts.highlight_button, osc_styles.control_text)
+    right_side_button("clip", 700, user_opts.clip_button and not state.is_URL, osc_styles.control_text)
+    right_side_button("download", 750, state.is_URL and user_opts.download_button)
+    right_side_button("speed", 800, user_opts.speed_button, osc_styles.speed, 42)
 
     elements["cache_info"].visible = user_opts.cache_info and osc_geo.w >= 850
     if elements["cache_info"].visible then
@@ -3156,6 +3176,29 @@ local function osc_init()
     ne.content = icons.screenshot
     ne.tooltipF = locale.screenshot
     bind_buttons("screenshot")
+
+    --JavBoss highlight
+    ne = new_element("highlight", "button")
+    ne.content = function()
+        local position = mp.get_property_number("time-pos", -1000)
+        for _, chapter in ipairs(state.chapter_list or {}) do
+            if tostring(chapter.title or ""):match("^★ ") and math.abs((chapter.time or 0) - position) <= 2 then
+                return icons.highlight_on
+            end
+        end
+        return icons.highlight
+    end
+    ne.tooltipF = function()
+        local count = mp.get_property_number("user-data/javboss/highlight-count", 0) or 0
+        return count > 0 and (locale.highlight .. " [" .. count .. "]") or locale.highlight
+    end
+    bind_buttons("highlight")
+
+    --JavBoss lossless clip
+    ne = new_element("clip", "button")
+    ne.content = icons.clip
+    ne.tooltipF = locale.clip
+    bind_buttons("clip")
 
     --file_loop
     ne = new_element("file_loop", "button")
