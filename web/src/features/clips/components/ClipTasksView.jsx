@@ -18,14 +18,22 @@ import {
 
 const terminalStatuses = new Set(['completed', 'failed', 'canceled'])
 
-function statusLabel(status) {
+function statusLabel(item) {
+  if (item?.status === 'running') {
+    return (
+      {
+        reading_network_source: zh('从网络盘读取', 'Reading network source'),
+        writing_network_output: zh('写回网络盘', 'Writing to network drive'),
+        clipping: zh('正在剪辑', 'Clipping'),
+      }[item?.phase] || zh('正在剪辑', 'Clipping')
+    )
+  }
   return (
     {
-      running: zh('正在剪辑', 'Clipping'),
       completed: zh('已完成', 'Completed'),
       failed: zh('失败', 'Failed'),
       canceled: zh('已取消', 'Canceled'),
-    }[status] || status
+    }[item?.status] || item?.status
   )
 }
 
@@ -164,7 +172,7 @@ export default function ClipTasksView({ onToast }) {
                                 : 'bg-blue-100 text-blue-700'
                         }`}
                       >
-                        {statusLabel(item.status)}
+                        {statusLabel(item)}
                         {item.error_message ? (
                           <Tooltip
                             arrow
