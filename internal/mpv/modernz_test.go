@@ -70,7 +70,7 @@ func TestBundledModernZEnablesFullscreenAutohide(t *testing.T) {
 	if !strings.Contains(string(config), "fullscreen_autohide=yes\n") {
 		t.Fatalf("expected bundled ModernZ config to enable fullscreen autohide")
 	}
-	if !strings.Contains(string(config), "osc_height=47\n") {
+	if !strings.Contains(string(config), "osc_height=52\n") {
 		t.Fatalf("expected bundled ModernZ config to use compact OSC height")
 	}
 	for _, expected := range []string{
@@ -81,6 +81,13 @@ func TestBundledModernZEnablesFullscreenAutohide(t *testing.T) {
 		"clip_button=yes\n",
 		"playlist_mbtn_left_command=script-message-to playlist_sidebar toggle\n",
 		"highlight_mbtn_left_command=script-message-to javboss_highlight_sidebar toggle\n",
+		"layout=modern-compact\n",
+		"osc_color=#17191F\n",
+		"seekbarfg_color=#0A84FF\n",
+		"osc_fade_strength=72\n",
+		"fade_blur_strength=55\n",
+		"dynamic_margins=no\n",
+		"visibility=auto\n",
 	} {
 		if !strings.Contains(string(config), expected) {
 			t.Fatalf("expected bundled ModernZ config to contain %q", expected)

@@ -440,11 +440,17 @@ func buildConfigContent() (string, error) {
 		fmt.Sprintf("ontop=%s", mpvBool(ontop)),
 		fmt.Sprintf("osd-playing-msg-duration=%d", startupHintDuration),
 		"video-align-y=0",
-		"video-margin-ratio-bottom=0.105",
+		"video-margin-ratio-bottom=0",
 		"watch-later-options-remove=sub-pos,osd-margin-y",
 	}
 	if runtime.GOOS == "darwin" {
-		lines = append(lines, "border=yes", "title-bar=yes")
+		lines = append(lines,
+			"border=yes",
+			"title-bar=yes",
+			"macos-title-bar-appearance=vibrantDark",
+			"macos-title-bar-material=underWindowBackground",
+			"macos-title-bar-color=#00000000",
+		)
 	}
 	lines = append(lines,
 		"auto-window-resize=no",
