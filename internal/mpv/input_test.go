@@ -52,8 +52,8 @@ func TestBuildConfigContentIncludesRequiredDefaults(t *testing.T) {
 	if !strings.Contains(content, "video-align-y=0\n") {
 		t.Fatalf("expected video-align-y=0 in mpv config, got %q", content)
 	}
-	if !strings.Contains(content, "video-margin-ratio-bottom=0.105\n") {
-		t.Fatalf("expected video-margin-ratio-bottom=0.105 in mpv config, got %q", content)
+	if !strings.Contains(content, "video-margin-ratio-bottom=0\n") {
+		t.Fatalf("expected video-margin-ratio-bottom=0 in mpv config, got %q", content)
 	}
 	if !strings.Contains(content, "watch-later-options-remove=sub-pos,osd-margin-y\n") {
 		t.Fatalf("expected watch-later overrides in mpv config, got %q", content)
@@ -64,6 +64,15 @@ func TestBuildConfigContentIncludesRequiredDefaults(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		if !strings.Contains(content, "border=yes\n") || !strings.Contains(content, "title-bar=yes\n") {
 			t.Fatalf("expected native macOS window controls in mpv config, got %q", content)
+		}
+		for _, expected := range []string{
+			"macos-title-bar-appearance=vibrantDark\n",
+			"macos-title-bar-material=underWindowBackground\n",
+			"macos-title-bar-color=#00000000\n",
+		} {
+			if !strings.Contains(content, expected) {
+				t.Fatalf("expected IINA-style macOS title bar option %q in mpv config", expected)
+			}
 		}
 		if strings.Contains(content, "border=no\n") {
 			t.Fatalf("macOS mpv config must not hide the native title bar: %q", content)
