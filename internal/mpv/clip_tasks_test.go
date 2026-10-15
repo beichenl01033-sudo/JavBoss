@@ -123,6 +123,59 @@ func TestClipTaskCanBeCanceled(t *testing.T) {
 	}
 }
 
+func TestClipTaskStagesNetworkOutputLocallyBeforeCopyingBack(t *testing.T) {
+	manager := newClipTaskManager(
+		func() (string, error) { return "clip-helper", nil },
+		clipHelperCommand("complete"),
+	)
+	manager.shouldStage = func(string) bool { return true }
+	manager.localTempRoot = t.TempDir()
+	t.Cleanup(manager.shutdown)
+
+	sourceDirectory := t.TempDir()
+	source := filepath.Join(sourceDirectory, "nas source.mp4")
+	if err := os.WriteFile(source, []byte("network-video"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	modifiedAt := time.Date(2019, 5, 6, 7, 8, 9, 0, time.UTC)
+	if err := os.Chtimes(source, modifiedAt, modifiedAt); err != nil {
+		t.Fatalf("set source time: %v", err)
+	}
+
+	task, err := manager.submit(clipRequest{Source: source, StartSeconds: 2, EndSeconds: 4})
+	if err != nil {
+		t.Fatalf("submit task: %v", err)
+	}
+	if !task.NetworkOptimized || task.Phase != ClipPhaseReadingNetwork {
+		t.Fatalf("network task did not enable local staging: %+v", task)
+	}
+	completed := waitForClipTask(t, manager, task.ID)
+	if completed.Status != ClipTaskCompleted || completed.Phase != ClipPhaseCompleted {
+		t.Fatalf("completed staged task = %+v", completed)
+	}
+	content, err := os.ReadFile(completed.OutputPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	if string(content) != "network-video" {
+		t.Fatalf("output content = %q", content)
+	}
+	info, err := os.Stat(completed.OutputPath)
+	if err != nil {
+		t.Fatalf("stat output: %v", err)
+	}
+	if !info.ModTime().Equal(modifiedAt) {
+		t.Fatalf("output modified time = %v, want %v", info.ModTime(), modifiedAt)
+	}
+	matches, err := filepath.Glob(filepath.Join(manager.localTempRoot, "javboss", "clip-tasks", "clip-*"))
+	if err != nil {
+		t.Fatalf("glob staging files: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("staging files were not cleaned up: %v", matches)
+	}
+}
+
 func clipHelperCommand(mode string) clipCommandContext {
 	return func(ctx context.Context, _ string, args ...string) *exec.Cmd {
 		commandArgs := append([]string{"-test.run=^TestClipTaskHelperProcess$", "--"}, args...)

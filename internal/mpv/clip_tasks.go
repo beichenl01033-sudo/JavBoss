@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -25,6 +26,11 @@ const (
 	ClipTaskCompleted = "completed"
 	ClipTaskFailed    = "failed"
 	ClipTaskCanceled  = "canceled"
+
+	ClipPhaseClipping       = "clipping"
+	ClipPhaseReadingNetwork = "reading_network_source"
+	ClipPhaseWritingNetwork = "writing_network_output"
+	ClipPhaseCompleted      = "completed"
 )
 
 var (
@@ -34,19 +40,21 @@ var (
 )
 
 type ClipTask struct {
-	ID             int64      `json:"id"`
-	SourcePath     string     `json:"source_path"`
-	SourceFilename string     `json:"source_filename"`
-	OutputPath     string     `json:"output_path"`
-	OutputFilename string     `json:"output_filename"`
-	StartSeconds   float64    `json:"start_seconds"`
-	EndSeconds     float64    `json:"end_seconds"`
-	Progress       float64    `json:"progress"`
-	Status         string     `json:"status"`
-	ErrorMessage   string     `json:"error_message,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	StartedAt      *time.Time `json:"started_at,omitempty"`
-	FinishedAt     *time.Time `json:"finished_at,omitempty"`
+	ID               int64      `json:"id"`
+	SourcePath       string     `json:"source_path"`
+	SourceFilename   string     `json:"source_filename"`
+	OutputPath       string     `json:"output_path"`
+	OutputFilename   string     `json:"output_filename"`
+	StartSeconds     float64    `json:"start_seconds"`
+	EndSeconds       float64    `json:"end_seconds"`
+	Progress         float64    `json:"progress"`
+	Phase            string     `json:"phase"`
+	NetworkOptimized bool       `json:"network_optimized"`
+	Status           string     `json:"status"`
+	ErrorMessage     string     `json:"error_message,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	StartedAt        *time.Time `json:"started_at,omitempty"`
+	FinishedAt       *time.Time `json:"finished_at,omitempty"`
 }
 
 type clipRequest struct {
@@ -71,6 +79,8 @@ type clipTaskManager struct {
 	closed         bool
 	resolveFFmpeg  func() (string, error)
 	commandContext clipCommandContext
+	shouldStage    func(string) bool
+	localTempRoot  string
 	wg             sync.WaitGroup
 }
 
@@ -81,6 +91,8 @@ func newClipTaskManager(resolveFFmpeg func() (string, error), commandContext cli
 		tasks:          make(map[int64]*clipTaskState),
 		resolveFFmpeg:  resolveFFmpeg,
 		commandContext: commandContext,
+		shouldStage:    shouldStageClipLocally,
+		localTempRoot:  os.TempDir(),
 	}
 }
 
@@ -133,21 +145,28 @@ func (m *clipTaskManager) submit(request clipRequest) (ClipTask, error) {
 		return ClipTask{}, errors.New("clip task manager is shutting down")
 	}
 	outputPath := m.nextOutputPathLocked(source, request.StartSeconds, request.EndSeconds)
+	networkOptimized := m.shouldStage != nil && m.shouldStage(source)
+	phase := ClipPhaseClipping
+	if networkOptimized {
+		phase = ClipPhaseReadingNetwork
+	}
 	m.nextID++
 	now := time.Now().UTC()
 	ctx, cancel := context.WithCancel(context.Background())
 	state := &clipTaskState{
 		task: ClipTask{
-			ID:             m.nextID,
-			SourcePath:     source,
-			SourceFilename: filepath.Base(source),
-			OutputPath:     outputPath,
-			OutputFilename: filepath.Base(outputPath),
-			StartSeconds:   request.StartSeconds,
-			EndSeconds:     request.EndSeconds,
-			Status:         ClipTaskRunning,
-			CreatedAt:      now,
-			StartedAt:      &now,
+			ID:               m.nextID,
+			SourcePath:       source,
+			SourceFilename:   filepath.Base(source),
+			OutputPath:       outputPath,
+			OutputFilename:   filepath.Base(outputPath),
+			StartSeconds:     request.StartSeconds,
+			EndSeconds:       request.EndSeconds,
+			Phase:            phase,
+			NetworkOptimized: networkOptimized,
+			Status:           ClipTaskRunning,
+			CreatedAt:        now,
+			StartedAt:        &now,
 		},
 		cancel: cancel,
 	}
@@ -266,8 +285,24 @@ func (m *clipTaskManager) run(ctx context.Context, id int64) {
 		return
 	}
 	extension := filepath.Ext(task.OutputPath)
-	tempPath := task.OutputPath + ".part" + extension
-	_ = os.Remove(tempPath)
+	finalTempPath := task.OutputPath + ".part" + extension
+	ffmpegTempPath := finalTempPath
+	if task.NetworkOptimized {
+		ffmpegTempPath, err = m.createLocalTempPath(id, extension)
+		if err != nil {
+			logging.Error("create local clip staging file failed, using direct output: %v", err)
+			task.NetworkOptimized = false
+			m.setNetworkOptimized(id, false)
+			ffmpegTempPath = finalTempPath
+		}
+	}
+	cleanup := func() {
+		_ = os.Remove(finalTempPath)
+		if ffmpegTempPath != finalTempPath {
+			_ = os.Remove(ffmpegTempPath)
+		}
+	}
+	cleanup()
 	duration := task.EndSeconds - task.StartSeconds
 	args := []string{
 		"-hide_banner", "-loglevel", "error",
@@ -279,7 +314,7 @@ func (m *clipTaskManager) run(ctx context.Context, id int64) {
 		"-avoid_negative_ts", "make_zero",
 		"-progress", "pipe:1",
 		"-nostats",
-		"-y", tempPath,
+		"-y", ffmpegTempPath,
 	}
 	cmd := m.commandContext(ctx, ffmpegPath, args...)
 	stdout, err := cmd.StdoutPipe()
@@ -307,13 +342,17 @@ func (m *clipTaskManager) run(ctx context.Context, id int64) {
 		if key == "out_time_us" || key == "out_time_ms" {
 			microseconds, parseErr := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
 			if parseErr == nil && duration > 0 {
-				m.updateProgress(id, math.Min(99.9, float64(microseconds)/1_000_000/duration*100))
+				progress := math.Min(99.9, float64(microseconds)/1_000_000/duration*100)
+				if task.NetworkOptimized {
+					progress *= 0.5
+				}
+				m.updateProgress(id, progress, "")
 			}
 		}
 	}
 	waitErr := cmd.Wait()
 	if ctx.Err() != nil {
-		_ = os.Remove(tempPath)
+		cleanup()
 		m.finish(id, ClipTaskCanceled, nil)
 		return
 	}
@@ -321,7 +360,7 @@ func (m *clipTaskManager) run(ctx context.Context, id int64) {
 		waitErr = scanErr
 	}
 	if waitErr != nil {
-		_ = os.Remove(tempPath)
+		cleanup()
 		detail := strings.TrimSpace(stderr.String())
 		if detail == "" {
 			detail = waitErr.Error()
@@ -329,30 +368,141 @@ func (m *clipTaskManager) run(ctx context.Context, id int64) {
 		m.finish(id, ClipTaskFailed, errors.New(detail))
 		return
 	}
+	if task.NetworkOptimized {
+		m.updateProgress(id, 50, ClipPhaseWritingNetwork)
+		if err := copyClipFile(ctx, ffmpegTempPath, finalTempPath, func(copied, total int64) {
+			if total > 0 {
+				m.updateProgress(id, 50+math.Min(49.9, float64(copied)/float64(total)*50), ClipPhaseWritingNetwork)
+			}
+		}); err != nil {
+			cleanup()
+			if ctx.Err() != nil {
+				m.finish(id, ClipTaskCanceled, nil)
+			} else {
+				m.finish(id, ClipTaskFailed, fmt.Errorf("write clip to network drive: %w", err))
+			}
+			return
+		}
+	}
 	sourceInfo, err := os.Stat(task.SourcePath)
 	if err != nil {
-		_ = os.Remove(tempPath)
+		cleanup()
 		m.finish(id, ClipTaskFailed, fmt.Errorf("stat clip source: %w", err))
 		return
 	}
-	if err := os.Chtimes(tempPath, sourceInfo.ModTime(), sourceInfo.ModTime()); err != nil {
-		_ = os.Remove(tempPath)
+	if err := os.Chtimes(finalTempPath, sourceInfo.ModTime(), sourceInfo.ModTime()); err != nil {
+		cleanup()
 		m.finish(id, ClipTaskFailed, fmt.Errorf("copy source modified time: %w", err))
 		return
 	}
-	if err := os.Rename(tempPath, task.OutputPath); err != nil {
-		_ = os.Remove(tempPath)
+	if err := os.Rename(finalTempPath, task.OutputPath); err != nil {
+		cleanup()
 		m.finish(id, ClipTaskFailed, fmt.Errorf("save clip output: %w", err))
 		return
+	}
+	if ffmpegTempPath != finalTempPath {
+		_ = os.Remove(ffmpegTempPath)
 	}
 	m.finish(id, ClipTaskCompleted, nil)
 }
 
-func (m *clipTaskManager) updateProgress(id int64, progress float64) {
+func (m *clipTaskManager) createLocalTempPath(id int64, extension string) (string, error) {
+	root := m.localTempRoot
+	if strings.TrimSpace(root) == "" {
+		root = os.TempDir()
+	}
+	directory := filepath.Join(root, "javboss", "clip-tasks")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return "", err
+	}
+	file, err := os.CreateTemp(directory, fmt.Sprintf("clip-%d-*%s", id, extension))
+	if err != nil {
+		return "", err
+	}
+	path := file.Name()
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := os.Remove(path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func copyClipFile(ctx context.Context, sourcePath, targetPath string, progress func(int64, int64)) error {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	info, err := source.Stat()
+	if err != nil {
+		return err
+	}
+	target, err := os.OpenFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = target.Close()
+		}
+	}()
+	buffer := make([]byte, 4<<20)
+	var copied int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		read, readErr := source.Read(buffer)
+		if read > 0 {
+			written, writeErr := target.Write(buffer[:read])
+			copied += int64(written)
+			if progress != nil {
+				progress(copied, info.Size())
+			}
+			if writeErr != nil {
+				return writeErr
+			}
+			if written != read {
+				return io.ErrShortWrite
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			return readErr
+		}
+	}
+	if err := target.Close(); err != nil {
+		return err
+	}
+	closed = true
+	return nil
+}
+
+func (m *clipTaskManager) setNetworkOptimized(id int64, enabled bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if state := m.tasks[id]; state != nil && state.task.Status == ClipTaskRunning {
+		state.task.NetworkOptimized = enabled
+		if !enabled {
+			state.task.Phase = ClipPhaseClipping
+		}
+	}
+}
+
+func (m *clipTaskManager) updateProgress(id int64, progress float64, phase string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if state := m.tasks[id]; state != nil && state.task.Status == ClipTaskRunning {
 		state.task.Progress = math.Max(state.task.Progress, math.Max(0, progress))
+		if phase != "" {
+			state.task.Phase = phase
+		}
 	}
 }
 
@@ -369,6 +519,7 @@ func (m *clipTaskManager) finish(id int64, status string, taskErr error) {
 	state.cancel = nil
 	if status == ClipTaskCompleted {
 		state.task.Progress = 100
+		state.task.Phase = ClipPhaseCompleted
 	}
 	if taskErr != nil {
 		state.task.ErrorMessage = taskErr.Error()
