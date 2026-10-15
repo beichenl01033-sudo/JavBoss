@@ -246,6 +246,9 @@ func TestBundledJavBossControlSupportsHighlightsAndBackgroundClips(t *testing.T)
 		`new_element("highlight", "button")`,
 		`new_element("clip", "button")`,
 		`new_element("menu", "button")`,
+		`local navigation_visible = pl_count > 1`,
+		`elements["playlist_prev"].enabled = pl_pos > 1`,
+		`elements["playlist_next"].enabled = pl_pos < pl_count`,
 	} {
 		if !strings.Contains(string(modernZ), expected) {
 			t.Fatalf("expected ModernZ script to contain %q", expected)
