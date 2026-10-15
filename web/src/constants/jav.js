@@ -4,6 +4,18 @@ export const JAV_PROVIDER_JAVDATABASE = 2
 export const JAV_PROVIDER_USER = 3
 export const JAV_PROVIDER_MANUAL_SCRAPE = 11
 
+export const JAV_ENTITY_OPEN_MODE_MODAL = 'modal'
+export const JAV_ENTITY_OPEN_MODE_PAGE = 'page'
+
+export function normalizeJavEntityOpenMode(value, fallback = JAV_ENTITY_OPEN_MODE_MODAL) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+  return normalized === JAV_ENTITY_OPEN_MODE_PAGE || normalized === JAV_ENTITY_OPEN_MODE_MODAL
+    ? normalized
+    : fallback
+}
+
 export const JAV_SORT_OPTIONS = [
   {
     base: 'recent',

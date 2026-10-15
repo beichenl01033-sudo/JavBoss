@@ -65,6 +65,10 @@ export default function JavSettings({ onClose, onError, onWaterfallChange, initi
       onJavFavoriteRatingShowFullChange={(value) =>
         setDraft((current) => ({ ...current, javFavoriteRatingShowFullInput: value }))
       }
+      javEntityOpenModeInput={draft.javEntityOpenModeInput}
+      onJavEntityOpenModeChange={(value) =>
+        setDraft((current) => ({ ...current, javEntityOpenModeInput: value }))
+      }
       javWaterfallDefaultInput={draft.javWaterfallDefaultInput}
       onJavWaterfallDefaultChange={(value) =>
         setDraft((current) => ({ ...current, javWaterfallDefaultInput: value }))

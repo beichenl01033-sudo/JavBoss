@@ -11,6 +11,7 @@ export default function JavRoute({
 
   buildJavUrl,
   handleSelectStudio,
+  handleOpenStudioWorks,
   handleSelectIdol,
   handleOpenIdolFavoriteModal,
   waterfallModes,
@@ -278,6 +279,7 @@ export default function JavRoute({
         onLast: () => setStudioPage(studioLastPage),
         items: studioItems,
         onSelectStudio: handleSelectStudio,
+        onOpenStudioWorks: handleOpenStudioWorks,
         onSelectSeries: handleSelectSeries,
         onSelectPrefix: handleSelectJavPrefix,
         onOpenFavorites: (studio) => handleOpenFavoriteModal('studio', studio),

@@ -2,14 +2,23 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   JAV_SORT_OPTIONS,
+  JAV_ENTITY_OPEN_MODE_MODAL,
+  JAV_ENTITY_OPEN_MODE_PAGE,
   IDOL_SORT_OPTIONS,
   findSortOption,
   normalizeIdolSort,
   normalizeJavSort,
   normalizeJavSortRules,
+  normalizeJavEntityOpenMode,
   resolveJavSort,
   reverseSortValue,
 } from '../../src/constants/jav.js'
+
+test('entity cover open mode defaults to modal and accepts the saved page mode', () => {
+  assert.equal(normalizeJavEntityOpenMode(), JAV_ENTITY_OPEN_MODE_MODAL)
+  assert.equal(normalizeJavEntityOpenMode(' PAGE '), JAV_ENTITY_OPEN_MODE_PAGE)
+  assert.equal(normalizeJavEntityOpenMode('invalid'), JAV_ENTITY_OPEN_MODE_MODAL)
+})
 
 test('JAV watch time sorting replaces play count and supports both directions', () => {
   assert.equal(

@@ -1,5 +1,6 @@
 import { configFlag } from '@/utils/config'
 import { normalizeWatchTimeIconMinutes } from '@/features/playback/watchTime'
+import { normalizeJavEntityOpenMode } from '@/constants/jav'
 
 export function createVideoSettingsDraft(state) {
   const { pageSize, sortOrder, videoHideJav, config } = state
@@ -43,6 +44,7 @@ export function createJavSettingsDraft(state) {
     javHideTagsInput: configFlag(config?.jav_hide_tags),
     javHideActionsInput: configFlag(config?.jav_hide_actions),
     javFavoriteRatingShowFullInput: configFlag(config?.jav_favorite_rating_show_full, false),
+    javEntityOpenModeInput: normalizeJavEntityOpenMode(config?.jav_entity_open_mode),
     javWaterfallDefaultInput: configFlag(config?.jav_waterfall_default),
     idolPageSizeInput: idolPageSize,
     idolWaterfallDefaultInput: configFlag(config?.idol_waterfall_default),

@@ -100,6 +100,7 @@ func updateConfig(c *gin.Context) {
 		JavHideTags               *bool                 `json:"jav_hide_tags"`
 		JavHideActions            *bool                 `json:"jav_hide_actions"`
 		JavFavoriteRatingFull     *bool                 `json:"jav_favorite_rating_show_full"`
+		JavEntityOpenMode         string                `json:"jav_entity_open_mode"`
 		JavWaterfallDefault       *bool                 `json:"jav_waterfall_default"`
 		IdolPageSize              *int                  `json:"idol_page_size"`
 		IdolWaterfallDefault      *bool                 `json:"idol_waterfall_default"`
@@ -229,6 +230,15 @@ func updateConfig(c *gin.Context) {
 	}
 	if req.JavFavoriteRatingFull != nil {
 		entries["jav_favorite_rating_show_full"] = strconv.FormatBool(*req.JavFavoriteRatingFull)
+	}
+	if mode := strings.ToLower(strings.TrimSpace(req.JavEntityOpenMode)); mode != "" {
+		switch mode {
+		case "modal", "page":
+			entries["jav_entity_open_mode"] = mode
+		default:
+			respondLocalizedError(c, http.StatusBadRequest, "JAV 详情打开方式无效", "Invalid JAV detail open mode")
+			return
+		}
 	}
 	if req.JavWaterfallDefault != nil {
 		entries["jav_waterfall_default"] = strconv.FormatBool(*req.JavWaterfallDefault)

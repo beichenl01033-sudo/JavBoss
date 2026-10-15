@@ -90,6 +90,7 @@ function JavStudioRoute({
   onNext,
   onOpenFavorites,
   onOpenSeriesFavorites,
+  onOpenStudioWorks,
   onSelectPrefix,
   onPrev,
   onSelectSeries,
@@ -144,6 +145,7 @@ function JavStudioRoute({
       onLast={onLast}
       items={items}
       onSelectStudio={onSelectStudio}
+      onOpenStudioWorks={onOpenStudioWorks}
       onSelectSeries={onSelectSeries}
       onSelectPrefix={onSelectPrefix}
       onOpenFavorites={onOpenFavorites}
