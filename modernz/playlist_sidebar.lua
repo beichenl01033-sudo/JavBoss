@@ -45,6 +45,7 @@ local visible_rows = 0
 local last_playlist_pos = -1
 local render_pending = false
 local sidebar_visible = false
+local sidebar_collapsed = false
 local current_width = opts.width
 local pane_left = 0
 local window_width = 0
@@ -174,7 +175,7 @@ end
 
 local function render()
     render_pending = false
-    if not opts.enabled then
+    if not opts.enabled or sidebar_collapsed then
         hide_sidebar()
         return
     end
@@ -235,11 +236,17 @@ local function render()
     )
     parts[#parts + 1] = string.format(
         "{\\an6\\pos(%d,%d)\\bord0\\shad0\\fs16\\b0\\fsp0\\fn%s\\1c&HAAAEB8&}%d / %d",
-        width - 16,
+        width - 54,
         math.floor(opts.header_height / 2),
         sidebar_font,
         current,
         count
+    )
+    parts[#parts + 1] = string.format(
+        "{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs24\\b0\\fn%s\\1c&HCDD0D7&}×",
+        width - 22,
+        math.floor(opts.header_height / 2),
+        sidebar_font
     )
 
     local last_visible = math.min(count, visible_start + visible_rows - 1)
@@ -301,7 +308,7 @@ local function render()
         )
     end
     parts[#parts + 1] = string.format(
-        "{\\an5\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs14\\b0\\fsp0\\fn%s\\1c&H9297A2&}拖动左边缘调宽 · 滚轮浏览 · 点击播放",
+        "{\\an5\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs14\\b0\\fsp0\\fn%s\\1c&H9297A2&}拖动左边缘调宽 · 列表按钮展开/收起 · 点击播放",
         pane_left + math.floor(pane_width / 2),
         height - math.floor(opts.footer_height / 2),
         pane_left + 6,
@@ -345,8 +352,15 @@ local function play_clicked_row()
     if not sidebar_visible then
         return
     end
-    local _, mouse_y = get_mouse_position()
-    if not mouse_y or mouse_y < opts.header_height then
+    local mouse_x, mouse_y = get_mouse_position()
+    if not mouse_y then
+        return
+    end
+    if mouse_y < opts.header_height then
+        if mouse_x and mouse_x >= window_width - 48 then
+            sidebar_collapsed = true
+            hide_sidebar()
+        end
         return
     end
     local row = math.floor((mouse_y - opts.header_height) / opts.row_height)
@@ -357,6 +371,25 @@ local function play_clicked_row()
     local playlist = mp.get_property_native("playlist", {}) or {}
     if index >= 1 and index <= #playlist then
         mp.commandv("playlist-play-index", index - 1)
+    end
+end
+
+local function show_sidebar()
+    sidebar_collapsed = false
+    mp.commandv("script-message-to", "javboss_highlight_sidebar", "hide")
+    request_render()
+end
+
+local function hide_sidebar_by_user()
+    sidebar_collapsed = true
+    hide_sidebar()
+end
+
+local function toggle_sidebar()
+    if sidebar_visible and not sidebar_collapsed then
+        hide_sidebar_by_user()
+    else
+        show_sidebar()
     end
 end
 
@@ -475,6 +508,9 @@ for _, property in ipairs({"playlist", "playlist-pos", "fullscreen", "osd-dimens
 end
 
 mp.add_hook("on_unload", 50, save_position_before_unload)
+mp.register_script_message("show", show_sidebar)
+mp.register_script_message("hide", hide_sidebar_by_user)
+mp.register_script_message("toggle", toggle_sidebar)
 mp.register_event("file-loaded", request_render)
 mp.register_event("shutdown", function()
     hide_sidebar()

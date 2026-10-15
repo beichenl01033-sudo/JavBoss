@@ -491,6 +491,7 @@ func buildCommandArgs(path string, options PlayOptions, ipcPath string, startIdl
 	args = append(args, "--script="+modernZ.ThumbfastScriptPath)
 	args = append(args, "--script="+modernZ.PlaylistScriptPath)
 	args = append(args, "--script="+modernZ.ControlScriptPath)
+	args = append(args, "--script="+modernZ.HighlightSidebarPath)
 	if ffmpegPath, resolveErr := util.ResolveFFmpegPath(); resolveErr == nil {
 		args = append(args, "--script-opt=javboss_control-ffmpeg_path="+ffmpegPath)
 	}
