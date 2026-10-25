@@ -6,15 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	"javboss/internal/common"
 	dbpkg "javboss/internal/db"
 )
 
 func TestBuildConfigContentIncludesRequiredDefaults(t *testing.T) {
-	prevDB := common.DB
-	common.DB = nil
+	previousProvider := playerConfigProvider
+	SetPlayerConfigProvider(nil)
 	defer func() {
-		common.DB = prevDB
+		SetPlayerConfigProvider(previousProvider)
 	}()
 
 	content, err := buildConfigContent()
@@ -81,10 +80,10 @@ func TestBuildConfigContentIncludesRequiredDefaults(t *testing.T) {
 }
 
 func TestBuildInputConfContentIncludesDefaultScreenshotKey(t *testing.T) {
-	prevDB := common.DB
-	common.DB = nil
+	previousProvider := playerConfigProvider
+	SetPlayerConfigProvider(nil)
 	defer func() {
-		common.DB = prevDB
+		SetPlayerConfigProvider(previousProvider)
 	}()
 
 	content, err := buildInputConfContent()
@@ -113,8 +112,8 @@ func TestBuildInputConfContentIncludesDefaultScreenshotKey(t *testing.T) {
 }
 
 func TestBuildInputConfContentQuitsWhenReuseWindowDisabled(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerReuseWindowConfigKey: "false",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -134,8 +133,8 @@ func TestBuildInputConfContentQuitsWhenReuseWindowDisabled(t *testing.T) {
 }
 
 func TestBuildInputConfContentWritesWatchLaterWhenResumeEnabled(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerResumePlaybackConfigKey: "true",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -152,8 +151,8 @@ func TestBuildInputConfContentWritesWatchLaterWhenResumeEnabled(t *testing.T) {
 }
 
 func TestBuildInputConfContentSkipsWatchLaterWhenResumeDisabled(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerResumePlaybackConfigKey: "false",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -173,10 +172,10 @@ func TestBuildInputConfContentSkipsWatchLaterWhenResumeDisabled(t *testing.T) {
 }
 
 func TestBuildStartupHotkeyHintIncludesDefaultHotkeys(t *testing.T) {
-	prevDB := common.DB
-	common.DB = nil
+	previousProvider := playerConfigProvider
+	SetPlayerConfigProvider(nil)
 	defer func() {
-		common.DB = prevDB
+		SetPlayerConfigProvider(previousProvider)
 	}()
 
 	content, err := buildStartupHotkeyHint()
@@ -202,8 +201,8 @@ func TestBuildStartupHotkeyHintIncludesDefaultHotkeys(t *testing.T) {
 }
 
 func TestBuildStartupHotkeyHintQuitsWhenReuseWindowDisabled(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerReuseWindowConfigKey: "false",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -223,8 +222,8 @@ func TestBuildStartupHotkeyHintQuitsWhenReuseWindowDisabled(t *testing.T) {
 }
 
 func TestBuildStartupHotkeyHintCanBeDisabled(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerShowHotkeyHintConfigKey: "false",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -241,8 +240,8 @@ func TestBuildStartupHotkeyHintCanBeDisabled(t *testing.T) {
 }
 
 func TestBuildConfigContentRespectsConfiguredOntop(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerOntopConfigKey: "true",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -259,8 +258,8 @@ func TestBuildConfigContentRespectsConfiguredOntop(t *testing.T) {
 }
 
 func TestBuildConfigContentEnablesResumePlayback(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerResumePlaybackConfigKey: "true",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -277,8 +276,8 @@ func TestBuildConfigContentEnablesResumePlayback(t *testing.T) {
 }
 
 func TestBuildConfigContentDisablesResumePlaybackLoading(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerResumePlaybackConfigKey: "false",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -298,10 +297,10 @@ func TestBuildConfigContentDisablesResumePlaybackLoading(t *testing.T) {
 }
 
 func TestLoadConfiguredPlayerReuseWindowDefaultsToTrue(t *testing.T) {
-	prevDB := common.DB
-	common.DB = nil
+	previousProvider := playerConfigProvider
+	SetPlayerConfigProvider(nil)
 	defer func() {
-		common.DB = prevDB
+		SetPlayerConfigProvider(previousProvider)
 	}()
 
 	if !loadConfiguredPlayerReuseWindow() {
@@ -310,8 +309,8 @@ func TestLoadConfiguredPlayerReuseWindowDefaultsToTrue(t *testing.T) {
 }
 
 func TestLoadConfiguredPlayerReuseWindowCanBeDisabled(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerReuseWindowConfigKey: "false",
 	}); err != nil {
 		t.Fatalf("upsert config: %v", err)
@@ -323,8 +322,8 @@ func TestLoadConfiguredPlayerReuseWindowCanBeDisabled(t *testing.T) {
 }
 
 func TestBuildConfigContentCentersConfiguredWindowSize(t *testing.T) {
-	openConfigTestDB(t)
-	if err := dbpkg.UpsertConfig(context.Background(), map[string]string{
+	store := openConfigTestDB(t)
+	if err := store.UpsertConfig(context.Background(), map[string]string{
 		playerWindowWidthConfigKey:  "80",
 		playerWindowHeightConfigKey: "60",
 	}); err != nil {
@@ -341,22 +340,23 @@ func TestBuildConfigContentCentersConfiguredWindowSize(t *testing.T) {
 	}
 }
 
-func openConfigTestDB(t *testing.T) {
+func openConfigTestDB(t *testing.T) *dbpkg.Store {
 	t.Helper()
 
-	prevDB := common.DB
+	previousProvider := playerConfigProvider
 	db, err := dbpkg.Open(t.TempDir() + "/test.db")
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
 	}
 
-	common.DB = db
+	SetPlayerConfigProvider(func() (map[string]string, error) { return dbpkg.NewStore(db).ListConfig(context.Background()) })
 	t.Cleanup(func() {
-		common.DB = prevDB
+		SetPlayerConfigProvider(previousProvider)
 		sqlDB, err := db.DB()
 		if err == nil {
 			_ = sqlDB.Close()
 		}
 	})
 
+	return dbpkg.NewStore(db)
 }

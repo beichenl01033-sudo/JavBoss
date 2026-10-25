@@ -4,7 +4,7 @@ import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined'
-import Tooltip from '@mui/material/Tooltip'
+import Tooltip from '@/shared/ui/Tooltip'
 import { useStore } from '@/store'
 import { configFlag } from '@/utils/config'
 import { getErrorMessage } from '@/utils/errors'

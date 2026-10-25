@@ -64,11 +64,10 @@ export default function SideTabs({
   onBrowserForward,
   onOpenDownload,
   onOpenGlobalSettings,
-  onOpenJavSettings,
+  onOpenDisplaySettings,
   onOpenJavTagModal,
   onJavPrefixClick,
   onOpenTagModal,
-  onOpenVideoSettings,
   onSelectTab,
   showDirectorySetupHint = false,
 }) {
@@ -144,7 +143,7 @@ export default function SideTabs({
           <RailButton
             icon={DisplaySettingsOutlinedIcon}
             label={zh('显示', 'Display')}
-            onClick={isJavMode ? onOpenJavSettings : onOpenVideoSettings}
+            onClick={onOpenDisplaySettings}
           />
         </div>
       </nav>

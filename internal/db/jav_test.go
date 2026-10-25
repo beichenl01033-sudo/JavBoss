@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"javboss/internal/common"
-	"javboss/internal/jav/metadata"
+	"javboss/internal/jav/scrape/metadata"
 	"javboss/internal/models"
 
 	"gorm.io/gorm"
 )
 
 func TestListJavsForDirectoryProcessingLoadsMetadataAndLocations(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -62,7 +62,7 @@ func TestListJavsForDirectoryProcessingLoadsMetadataAndLocations(t *testing.T) {
 	if err := gdb.Create(&video).Error; err != nil {
 		t.Fatalf("create video: %v", err)
 	}
-	location, err := UpsertVideoLocation(ctx, video.ID, dir.ID, "incoming/original.mp4", now)
+	location, err := deps.store.UpsertVideoLocation(ctx, video.ID, dir.ID, "incoming/original.mp4", now)
 	if err != nil {
 		t.Fatalf("create location: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestListJavsForDirectoryProcessingLoadsMetadataAndLocations(t *testing.T) {
 		t.Fatalf("link location to JAV: %v", err)
 	}
 
-	items, err := ListJavsForDirectoryProcessing(ctx, dir.ID)
+	items, err := deps.store.ListJavsForDirectoryProcessing(ctx, dir.ID)
 	if err != nil {
 		t.Fatalf("list JAVs for directory processing: %v", err)
 	}
@@ -96,7 +96,8 @@ func TestListJavsForDirectoryProcessingLoadsMetadataAndLocations(t *testing.T) {
 }
 
 func TestListJavFilterOptionsUsesCurrentFilterIntersection(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -148,7 +149,7 @@ func TestListJavFilterOptionsUsesCurrentFilterIntersection(t *testing.T) {
 		if err := gdb.Create(&video).Error; err != nil {
 			t.Fatalf("create video: %v", err)
 		}
-		location, err := UpsertVideoLocation(ctx, video.ID, directory.ID, fmt.Sprintf("work-%d.mp4", index), now)
+		location, err := deps.store.UpsertVideoLocation(ctx, video.ID, directory.ID, fmt.Sprintf("work-%d.mp4", index), now)
 		if err != nil {
 			t.Fatalf("create location: %v", err)
 		}
@@ -157,7 +158,7 @@ func TestListJavFilterOptionsUsesCurrentFilterIntersection(t *testing.T) {
 		}
 	}
 
-	options, err := ListJavFilterOptions(
+	options, err := deps.store.ListJavFilterOptions(
 		ctx,
 		[]int64{idols[0].ID},
 		[]int64{tags[0].ID},
@@ -211,7 +212,7 @@ func TestListJavFilterOptionsUsesCurrentFilterIntersection(t *testing.T) {
 		t.Fatalf("prefix counts = %#v", prefixCounts)
 	}
 
-	searched, err := ListJavFilterOptions(
+	searched, err := deps.store.ListJavFilterOptions(
 		ctx,
 		[]int64{idols[0].ID},
 		[]int64{tags[0].ID},
@@ -241,7 +242,8 @@ func TestListJavFilterOptionsUsesCurrentFilterIntersection(t *testing.T) {
 }
 
 func TestListJavCodesForDirectoryOnlyReturnsVisibleDistinctCodes(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -277,7 +279,7 @@ func TestListJavCodesForDirectoryOnlyReturnsVisibleDistinctCodes(t *testing.T) {
 		{directories[0].ID, "hidden.mp4"},
 		{directories[1].ID, "other.mp4"},
 	} {
-		location, err := UpsertVideoLocation(ctx, videos[i].ID, input.directoryID, input.path, now)
+		location, err := deps.store.UpsertVideoLocation(ctx, videos[i].ID, input.directoryID, input.path, now)
 		if err != nil {
 			t.Fatalf("create location %q: %v", input.path, err)
 		}
@@ -301,7 +303,7 @@ func TestListJavCodesForDirectoryOnlyReturnsVisibleDistinctCodes(t *testing.T) {
 		t.Fatalf("hide location: %v", err)
 	}
 
-	got, err := ListJavCodesForDirectory(ctx, directories[0].ID)
+	got, err := deps.store.ListJavCodesForDirectory(ctx, directories[0].ID)
 	if err != nil {
 		t.Fatalf("list directory JAV codes: %v", err)
 	}
@@ -312,7 +314,8 @@ func TestListJavCodesForDirectoryOnlyReturnsVisibleDistinctCodes(t *testing.T) {
 }
 
 func TestListJavIdolsOnlyIncludesIdolsWithVisibleSoloWorks(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -389,7 +392,7 @@ func TestListJavIdolsOnlyIncludesIdolsWithVisibleSoloWorks(t *testing.T) {
 		t.Fatalf("mark unavailable video location deleted: %v", err)
 	}
 
-	items, total, err := ListJavIdols(ctx, "", "", 20, 0, nil, 0)
+	items, total, err := deps.store.ListJavIdols(ctx, "", "", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols: %v", err)
 	}
@@ -412,7 +415,8 @@ func TestListJavIdolsOnlyIncludesIdolsWithVisibleSoloWorks(t *testing.T) {
 }
 
 func TestListJavIdolOptionsIncludesIdolsWithoutWorks(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 
 	idols := []models.JavIdol{
@@ -444,7 +448,7 @@ func TestListJavIdolOptionsIncludesIdolsWithoutWorks(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, video)
 
-	items, total, err := ListJavIdolOptions(ctx, "", 20, 0, []int64{directory.ID})
+	items, total, err := deps.store.ListJavIdolOptions(ctx, "", 20, 0, []int64{directory.ID})
 	if err != nil {
 		t.Fatalf("ListJavIdolOptions: %v", err)
 	}
@@ -456,7 +460,8 @@ func TestListJavIdolOptionsIncludesIdolsWithoutWorks(t *testing.T) {
 }
 
 func TestListJavPrefixesAndSearchByPrefix(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 	censored := false
@@ -504,7 +509,7 @@ func TestListJavPrefixesAndSearchByPrefix(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	prefixes, err := ListJavPrefixes(ctx, nil)
+	prefixes, err := deps.store.ListJavPrefixes(ctx, nil)
 	if err != nil {
 		t.Fatalf("ListJavPrefixes: %v", err)
 	}
@@ -527,7 +532,7 @@ func TestListJavPrefixesAndSearchByPrefix(t *testing.T) {
 		t.Fatalf("unexpected unknown-studio prefix: %#v", prefixes[2])
 	}
 
-	items, total, err := SearchJavWithPrefix(ctx, nil, nil, "", "pfx", "code", 20, 0, nil, nil)
+	items, total, err := deps.store.SearchJavWithPrefix(ctx, nil, nil, "", "pfx", "code", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJavWithPrefix: %v", err)
 	}
@@ -538,7 +543,7 @@ func TestListJavPrefixesAndSearchByPrefix(t *testing.T) {
 		t.Fatalf("unexpected pfx codes: %#v", []string{items[0].Code, items[1].Code, items[2].Code, items[3].Code})
 	}
 
-	items, total, err = SearchJavWithPrefix(ctx, nil, nil, "", "pfx", "code", 20, 0, nil, nil, 0)
+	items, total, err = deps.store.SearchJavWithPrefix(ctx, nil, nil, "", "pfx", "code", 20, 0, nil, nil, 0)
 	if err != nil {
 		t.Fatalf("SearchJavWithPrefix unknown studio: %v", err)
 	}
@@ -548,7 +553,8 @@ func TestListJavPrefixesAndSearchByPrefix(t *testing.T) {
 }
 
 func TestDeleteJavFavoriteGroupCascadesMapsOnNewConnection(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 
 	group := models.JavIdolFavoriteGroup{Name: "Favorites"}
@@ -601,7 +607,7 @@ func TestDeleteJavFavoriteGroupCascadesMapsOnNewConnection(t *testing.T) {
 		t.Fatalf("foreign_keys pragma = %d, want 1", foreignKeysEnabled)
 	}
 
-	if err := DeleteJavFavoriteGroup(ctx, JavFavoriteEntityIdol, group.ID); err != nil {
+	if err := deps.store.DeleteJavFavoriteGroup(ctx, JavFavoriteEntityIdol, group.ID); err != nil {
 		t.Fatalf("DeleteJavFavoriteGroup: %v", err)
 	}
 
@@ -627,7 +633,8 @@ func TestDeleteJavFavoriteGroupCascadesMapsOnNewConnection(t *testing.T) {
 }
 
 func TestListJavFavoriteGroupsCountsOnlyVisibleItems(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 	dir := models.Directory{Path: "/tmp/media"}
@@ -736,7 +743,7 @@ func TestListJavFavoriteGroupsCountsOnlyVisibleItems(t *testing.T) {
 
 	assertFavoriteGroupCount := func(entityType string, want int64) []JavFavoriteItemSummary {
 		t.Helper()
-		got, err := ListJavFavoriteGroups(ctx, entityType, nil)
+		got, err := deps.store.ListJavFavoriteGroups(ctx, entityType, nil)
 		if err != nil {
 			t.Fatalf("ListJavFavoriteGroups(%s): %v", entityType, err)
 		}
@@ -747,7 +754,7 @@ func TestListJavFavoriteGroupsCountsOnlyVisibleItems(t *testing.T) {
 			t.Fatalf("ListJavFavoriteGroups(%s) count = %d, want %d", entityType, got[0].Count, want)
 		}
 
-		items, err := ListJavFavoriteGroupItems(ctx, entityType, got[0].ID, nil)
+		items, err := deps.store.ListJavFavoriteGroupItems(ctx, entityType, got[0].ID, nil)
 		if err != nil {
 			t.Fatalf("ListJavFavoriteGroupItems(%s): %v", entityType, err)
 		}
@@ -767,7 +774,8 @@ func TestListJavFavoriteGroupsCountsOnlyVisibleItems(t *testing.T) {
 }
 
 func TestSearchJavFiltersByIdolIDs(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -815,7 +823,7 @@ func TestSearchJavFiltersByIdolIDs(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	items, total, err := SearchJav(ctx, []int64{idolA.ID, idolB.ID}, nil, "", "code", 20, 0, nil, nil)
+	items, total, err := deps.store.SearchJav(ctx, []int64{idolA.ID, idolB.ID}, nil, "", "code", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav by idol ids: %v", err)
 	}
@@ -828,7 +836,8 @@ func TestSearchJavFiltersByIdolIDs(t *testing.T) {
 }
 
 func TestSearchJavFiltersSoloOnlyByIdolCount(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 	dir := models.Directory{Path: "/tmp/media"}
@@ -877,7 +886,7 @@ func TestSearchJavFiltersSoloOnlyByIdolCount(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	items, total, err := SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil, 0, 0, 1)
+	items, total, err := deps.store.SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil, 0, 0, 1)
 	if err != nil {
 		t.Fatalf("SearchJav solo only: %v", err)
 	}
@@ -890,7 +899,8 @@ func TestSearchJavFiltersSoloOnlyByIdolCount(t *testing.T) {
 }
 
 func TestUpdateJavReplacesEditableMetadata(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -998,15 +1008,15 @@ func TestUpdateJavReplacesEditableMetadata(t *testing.T) {
 
 	studioID := studioByName["New Studio"].ID
 	seriesID := seriesByName["New Series"].ID
-	aliasIdol, err := CreateJavIdol(ctx, "New Idol B Alias")
+	aliasIdol, err := deps.store.CreateJavIdol(ctx, "New Idol B Alias")
 	if err != nil {
 		t.Fatalf("CreateJavIdol alias: %v", err)
 	}
-	typedIdol, err := CreateJavIdol(ctx, "Typed Idol")
+	typedIdol, err := deps.store.CreateJavIdol(ctx, "Typed Idol")
 	if err != nil {
 		t.Fatalf("CreateJavIdol typed: %v", err)
 	}
-	replacementTag, err := CreateJavScrapedTag(ctx, "Scraped Replacement")
+	replacementTag, err := deps.store.CreateJavScrapedTag(ctx, "Scraped Replacement")
 	if err != nil {
 		t.Fatalf("CreateJavScrapedTag: %v", err)
 	}
@@ -1015,7 +1025,7 @@ func TestUpdateJavReplacesEditableMetadata(t *testing.T) {
 	scrapedTagIDs := []int64{replacementTag.ID, replacementTag.ID}
 	releaseUnix := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC).Unix()
 	durationMin := 123
-	updated, err := UpdateJav(ctx, javRec.ID, JavUpdateInput{
+	updated, err := deps.store.UpdateJav(ctx, javRec.ID, JavUpdateInput{
 		StudioID:      &studioID,
 		SeriesID:      &seriesID,
 		IdolIDs:       &idolIDs,
@@ -1104,7 +1114,8 @@ func TestUpdateJavReplacesEditableMetadata(t *testing.T) {
 }
 
 func TestUpdateJavEditsTitle(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Now()
 
@@ -1114,7 +1125,7 @@ func TestUpdateJavEditsTitle(t *testing.T) {
 	}
 
 	zhTitle := "新标题"
-	updated, err := UpdateJav(ctx, javRec.ID, JavUpdateInput{Title: &zhTitle}, nil)
+	updated, err := deps.store.UpdateJav(ctx, javRec.ID, JavUpdateInput{Title: &zhTitle}, nil)
 	if err != nil {
 		t.Fatalf("UpdateJav title: %v", err)
 	}
@@ -1125,7 +1136,8 @@ func TestUpdateJavEditsTitle(t *testing.T) {
 }
 
 func TestUpdateJavFavoriteRating(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	javRec := models.Jav{Code: "RATING-EDIT", Title: "Rating"}
 	if err := db.Create(&javRec).Error; err != nil {
@@ -1133,7 +1145,7 @@ func TestUpdateJavFavoriteRating(t *testing.T) {
 	}
 
 	rating := 4.5
-	updated, err := UpdateJav(ctx, javRec.ID, JavUpdateInput{FavoriteRating: &rating}, nil)
+	updated, err := deps.store.UpdateJav(ctx, javRec.ID, JavUpdateInput{FavoriteRating: &rating}, nil)
 	if err != nil {
 		t.Fatalf("UpdateJav favorite rating: %v", err)
 	}
@@ -1142,7 +1154,7 @@ func TestUpdateJavFavoriteRating(t *testing.T) {
 	}
 
 	clearRating := float64(0)
-	updated, err = UpdateJav(ctx, javRec.ID, JavUpdateInput{FavoriteRating: &clearRating}, nil)
+	updated, err = deps.store.UpdateJav(ctx, javRec.ID, JavUpdateInput{FavoriteRating: &clearRating}, nil)
 	if err != nil {
 		t.Fatalf("clear JAV favorite rating: %v", err)
 	}
@@ -1152,14 +1164,15 @@ func TestUpdateJavFavoriteRating(t *testing.T) {
 
 	for _, invalid := range []float64{-0.5, 0.25, 5.5} {
 		invalid := invalid
-		if _, err := UpdateJav(ctx, javRec.ID, JavUpdateInput{FavoriteRating: &invalid}, nil); err == nil {
+		if _, err := deps.store.UpdateJav(ctx, javRec.ID, JavUpdateInput{FavoriteRating: &invalid}, nil); err == nil {
 			t.Fatalf("UpdateJav accepted invalid favorite rating %v", invalid)
 		}
 	}
 }
 
 func TestSearchJavSortByFavoriteRating(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1191,7 +1204,7 @@ func TestSearchJavSortByFavoriteRating(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	items, total, err := SearchJav(ctx, nil, nil, "", "favorite_rating", 20, 0, nil, nil)
+	items, total, err := deps.store.SearchJav(ctx, nil, nil, "", "favorite_rating", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav favorite rating: %v", err)
 	}
@@ -1200,7 +1213,7 @@ func TestSearchJavSortByFavoriteRating(t *testing.T) {
 		t.Fatalf("favorite rating desc order = %#v (total %d)", items, total)
 	}
 
-	items, total, err = SearchJav(ctx, nil, nil, "", "favorite_rating_asc", 20, 0, nil, nil)
+	items, total, err = deps.store.SearchJav(ctx, nil, nil, "", "favorite_rating_asc", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav favorite rating asc: %v", err)
 	}
@@ -1211,7 +1224,7 @@ func TestSearchJavSortByFavoriteRating(t *testing.T) {
 
 	minRating := 2.0
 	maxRating := 5.0
-	items, total, err = SearchJavWithPrefixFilters(ctx, nil, nil, "", "", "code", 20, 0, nil, nil, JavSearchFilters{
+	items, total, err = deps.store.SearchJavWithPrefixFilters(ctx, nil, nil, "", "", "code", 20, 0, nil, nil, JavSearchFilters{
 		StudioID:          -1,
 		FavoriteRatingMin: &minRating,
 		FavoriteRatingMax: &maxRating,
@@ -1225,7 +1238,8 @@ func TestSearchJavSortByFavoriteRating(t *testing.T) {
 }
 
 func TestSearchJavSortByLatestFileModifiedTimeAndDirectory(t *testing.T) {
-	database := openTestDB(t)
+	deps := newTestDependencies()
+	database := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1250,7 +1264,7 @@ func TestSearchJavSortByLatestFileModifiedTimeAndDirectory(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, database, videos...)
 
-	items, total, err := SearchJav(ctx, nil, nil, "", "modified", 20, 0, nil, nil)
+	items, total, err := deps.store.SearchJav(ctx, nil, nil, "", "modified", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav modified: %v", err)
 	}
@@ -1258,7 +1272,7 @@ func TestSearchJavSortByLatestFileModifiedTimeAndDirectory(t *testing.T) {
 		t.Fatalf("modified order = %#v total=%d, want latest copy first", items, total)
 	}
 
-	items, total, err = SearchJav(ctx, nil, nil, "", "modified", 20, 0, nil, []int64{directories[0].ID})
+	items, total, err = deps.store.SearchJav(ctx, nil, nil, "", "modified", 20, 0, nil, []int64{directories[0].ID})
 	if err != nil {
 		t.Fatalf("SearchJav modified directory filter: %v", err)
 	}
@@ -1266,7 +1280,7 @@ func TestSearchJavSortByLatestFileModifiedTimeAndDirectory(t *testing.T) {
 		t.Fatalf("directory-scoped modified order = %#v total=%d, want directory A latest first", items, total)
 	}
 
-	items, total, err = SearchJav(ctx, nil, nil, "", "modified_asc", 20, 0, nil, nil)
+	items, total, err = deps.store.SearchJav(ctx, nil, nil, "", "modified_asc", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav modified_asc: %v", err)
 	}
@@ -1276,7 +1290,8 @@ func TestSearchJavSortByLatestFileModifiedTimeAndDirectory(t *testing.T) {
 }
 
 func TestListJavStudiosAndSearchByStudio(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1326,7 +1341,7 @@ func TestListJavStudiosAndSearchByStudio(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	studios, total, err := ListJavStudios(ctx, "", 20, 0, nil)
+	studios, total, err := deps.store.ListJavStudios(ctx, "", 20, 0, nil)
 	if err != nil {
 		t.Fatalf("ListJavStudios: %v", err)
 	}
@@ -1364,7 +1379,7 @@ func TestListJavStudiosAndSearchByStudio(t *testing.T) {
 		t.Fatalf("unexpected second studio series: %#v", studios[0].Series[1])
 	}
 
-	items, total, err := SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil, studioA.ID)
+	items, total, err := deps.store.SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil, studioA.ID)
 	if err != nil {
 		t.Fatalf("SearchJav by studio: %v", err)
 	}
@@ -1379,7 +1394,8 @@ func TestListJavStudiosAndSearchByStudio(t *testing.T) {
 }
 
 func TestListJavSeriesAndSearchBySeries(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1415,7 +1431,7 @@ func TestListJavSeriesAndSearchBySeries(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	series, total, err := ListJavSeries(ctx, "", 20, 0, nil)
+	series, total, err := deps.store.ListJavSeries(ctx, "", 20, 0, nil)
 	if err != nil {
 		t.Fatalf("ListJavSeries: %v", err)
 	}
@@ -1435,7 +1451,7 @@ func TestListJavSeriesAndSearchBySeries(t *testing.T) {
 		t.Fatalf("expected sample code for zh series")
 	}
 
-	items, total, err := SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil, 0, seriesA.ID)
+	items, total, err := deps.store.SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil, 0, seriesA.ID)
 	if err != nil {
 		t.Fatalf("SearchJav by zh series: %v", err)
 	}
@@ -1451,7 +1467,7 @@ func TestListJavSeriesAndSearchBySeries(t *testing.T) {
 		}
 	}
 
-	codes, err := ListSeriesCoverCodes(ctx, seriesA.ID, nil)
+	codes, err := deps.store.ListSeriesCoverCodes(ctx, seriesA.ID, nil)
 	if err != nil {
 		t.Fatalf("ListSeriesCoverCodes zh: %v", err)
 	}
@@ -1461,7 +1477,8 @@ func TestListJavSeriesAndSearchBySeries(t *testing.T) {
 }
 
 func TestSaveJavInfoAppendsIdolsOnlyWhenMappingMissing(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	now := time.Unix(1710000000, 0).UTC()
 
 	save := func(info *metadata.JavInfo) {
@@ -1496,7 +1513,8 @@ func TestSaveJavInfoAppendsIdolsOnlyWhenMappingMissing(t *testing.T) {
 }
 
 func TestAppendJavIdolsIfMissingForProvider(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1505,7 +1523,7 @@ func TestAppendJavIdolsIfMissingForProvider(t *testing.T) {
 		t.Fatalf("create jav: %v", err)
 	}
 
-	updated, err := AppendJavIdolsIfMissingForProvider(ctx, javRec.ID, []string{"小橋りえこ", "小橋りえこ"}, metadata.ProviderAvsox)
+	updated, err := deps.store.AppendJavIdolsIfMissingForProvider(ctx, javRec.ID, []string{"小橋りえこ", "小橋りえこ"}, metadata.ProviderAvsox)
 	if err != nil {
 		t.Fatalf("AppendJavIdolsIfMissingForProvider: %v", err)
 	}
@@ -1517,7 +1535,7 @@ func TestAppendJavIdolsIfMissingForProvider(t *testing.T) {
 	})
 	assertJavTitle(t, gdb, "AVS-001", "Kept Title")
 
-	updated, err = AppendJavIdolsIfMissingForProvider(ctx, javRec.ID, []string{"別の女優"}, metadata.ProviderAvsox)
+	updated, err = deps.store.AppendJavIdolsIfMissingForProvider(ctx, javRec.ID, []string{"別の女優"}, metadata.ProviderAvsox)
 	if err != nil {
 		t.Fatalf("AppendJavIdolsIfMissingForProvider second call: %v", err)
 	}
@@ -1530,7 +1548,8 @@ func TestAppendJavIdolsIfMissingForProvider(t *testing.T) {
 }
 
 func TestSaveManualJavInfoAndLinkVideoLocationsLinksAllLocations(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1547,16 +1566,16 @@ func TestSaveManualJavInfoAndLinkVideoLocationsLinksAllLocations(t *testing.T) {
 	if err := gdb.Create(&video).Error; err != nil {
 		t.Fatalf("create video: %v", err)
 	}
-	locA, err := UpsertVideoLocation(ctx, video.ID, dirs[0].ID, "a/MAN-001.mp4", now)
+	locA, err := deps.store.UpsertVideoLocation(ctx, video.ID, dirs[0].ID, "a/MAN-001.mp4", now)
 	if err != nil {
 		t.Fatalf("upsert loc a: %v", err)
 	}
-	locB, err := UpsertVideoLocation(ctx, video.ID, dirs[1].ID, "b/MAN-001.mp4", now)
+	locB, err := deps.store.UpsertVideoLocation(ctx, video.ID, dirs[1].ID, "b/MAN-001.mp4", now)
 	if err != nil {
 		t.Fatalf("upsert loc b: %v", err)
 	}
 
-	rec, err := SaveManualJavInfoAndLinkVideoLocations(ctx, &metadata.JavInfo{
+	rec, err := deps.store.SaveManualJavInfoAndLinkVideoLocations(ctx, &metadata.JavInfo{
 		Code:     "MAN-001",
 		Title:    "Manual Title",
 		Tags:     []string{"Manual Tag"},
@@ -1592,7 +1611,7 @@ func TestSaveManualJavInfoAndLinkVideoLocationsLinksAllLocations(t *testing.T) {
 		}
 	}
 
-	videoForLocation, err := GetVideoForLocation(ctx, video.ID, locA.ID)
+	videoForLocation, err := deps.store.GetVideoForLocation(ctx, video.ID, locA.ID)
 	if err != nil {
 		t.Fatalf("GetVideoForLocation: %v", err)
 	}
@@ -1605,7 +1624,8 @@ func TestSaveManualJavInfoAndLinkVideoLocationsLinksAllLocations(t *testing.T) {
 }
 
 func TestLinkVideoLocationsToExistingJavRollsBackWhenOverrideUpdateFails(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1625,7 +1645,7 @@ func TestLinkVideoLocationsToExistingJavRollsBackWhenOverrideUpdateFails(t *test
 	if err := gdb.Create(&video).Error; err != nil {
 		t.Fatalf("create video: %v", err)
 	}
-	loc, err := UpsertVideoLocation(ctx, video.ID, dir.ID, "movie.mp4", now)
+	loc, err := deps.store.UpsertVideoLocation(ctx, video.ID, dir.ID, "movie.mp4", now)
 	if err != nil {
 		t.Fatalf("create video location: %v", err)
 	}
@@ -1642,7 +1662,7 @@ func TestLinkVideoLocationsToExistingJavRollsBackWhenOverrideUpdateFails(t *test
 		t.Fatalf("create failure trigger: %v", err)
 	}
 
-	if _, err := LinkVideoLocationsToExistingJav(ctx, newJav.Code, video.ID); err == nil {
+	if _, err := deps.store.LinkVideoLocationsToExistingJav(ctx, newJav.Code, video.ID); err == nil {
 		t.Fatal("expected override update failure")
 	}
 
@@ -1663,7 +1683,8 @@ func TestLinkVideoLocationsToExistingJavRollsBackWhenOverrideUpdateFails(t *test
 }
 
 func TestSaveJavInfoPersistsUncensoredState(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1710,18 +1731,19 @@ func TestSaveJavInfoPersistsUncensoredState(t *testing.T) {
 	if err := gdb.Where("code = ?", "UNK-001").First(&unknownRec).Error; err != nil {
 		t.Fatalf("load unknown jav: %v", err)
 	}
-	if err := UpdateJavIsUncensoredIfUnknown(ctx, unknownRec.ID, uncensored); err != nil {
+	if err := deps.store.UpdateJavIsUncensoredIfUnknown(ctx, unknownRec.ID, uncensored); err != nil {
 		t.Fatalf("update unknown is_uncensored: %v", err)
 	}
 	assertState("UNK-001", &uncensored)
-	if err := UpdateJavIsUncensoredIfUnknown(ctx, unknownRec.ID, censored); err != nil {
+	if err := deps.store.UpdateJavIsUncensoredIfUnknown(ctx, unknownRec.ID, censored); err != nil {
 		t.Fatalf("update known is_uncensored: %v", err)
 	}
 	assertState("UNK-001", &uncensored)
 }
 
 func TestSaveJavInfoReplacesOnlyCurrentProviderTags(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	now := time.Unix(1710000000, 0).UTC()
 
 	save := func(info *metadata.JavInfo) {
@@ -1775,10 +1797,11 @@ func TestSaveJavInfoReplacesOnlyCurrentProviderTags(t *testing.T) {
 }
 
 func TestJavMenuTagsAreVisible(t *testing.T) {
-	openTestDB(t)
+	deps := newTestDependencies()
+	openTestDB(deps, t)
 	ctx := context.Background()
 
-	saved, err := SaveJavInfo(ctx, &metadata.JavInfo{
+	saved, err := deps.store.SaveJavInfo(ctx, &metadata.JavInfo{
 		Code:     "JMENU-001",
 		Title:    "JavMenu metadata",
 		Tags:     []string{"美少女", "接吻"},
@@ -1788,7 +1811,7 @@ func TestJavMenuTagsAreVisible(t *testing.T) {
 		t.Fatalf("SaveJavInfo: %v", err)
 	}
 
-	got, err := GetJav(ctx, saved.ID, nil)
+	got, err := deps.store.GetJav(ctx, saved.ID, nil)
 	if err != nil {
 		t.Fatalf("GetJav: %v", err)
 	}
@@ -1803,7 +1826,8 @@ func TestJavMenuTagsAreVisible(t *testing.T) {
 }
 
 func TestUserJavTagNameDoesNotModifyScrapedTag(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -1830,7 +1854,7 @@ func TestUserJavTagNameDoesNotModifyScrapedTag(t *testing.T) {
 		t.Fatalf("create tag maps: %v", err)
 	}
 
-	if err := RenameJavTag(ctx, user.ID, "Renamed User"); err != nil {
+	if err := deps.store.RenameJavTag(ctx, user.ID, "Renamed User"); err != nil {
 		t.Fatalf("RenameJavTag user: %v", err)
 	}
 	var scrapedAfter models.JavTag
@@ -1850,7 +1874,8 @@ func TestUserJavTagNameDoesNotModifyScrapedTag(t *testing.T) {
 }
 
 func TestEnsureJavTagsTraditionalizesAndDeduplicatesScrapedNames(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 
 	tags, err := ensureJavTagsTx(
@@ -1873,7 +1898,7 @@ func TestEnsureJavTagsTraditionalizesAndDeduplicatesScrapedNames(t *testing.T) {
 		t.Fatalf("repeated scraped tags = %#v, want existing IDs %#v", repeated, tags)
 	}
 
-	userTag, err := CreateJavTag(ctx, "女优")
+	userTag, err := deps.store.CreateJavTag(ctx, "女优")
 	if err != nil {
 		t.Fatalf("create simplified user JAV tag: %v", err)
 	}
@@ -1891,15 +1916,16 @@ func TestEnsureJavTagsTraditionalizesAndDeduplicatesScrapedNames(t *testing.T) {
 }
 
 func TestCreatedUserJavTagAppearsWithZeroCount(t *testing.T) {
-	openTestDB(t)
+	deps := newTestDependencies()
+	openTestDB(deps, t)
 	ctx := context.Background()
 
-	created, err := CreateJavTag(ctx, "Empty User Tag")
+	created, err := deps.store.CreateJavTag(ctx, "Empty User Tag")
 	if err != nil {
 		t.Fatalf("CreateJavTag: %v", err)
 	}
 
-	tags, err := ListJavTags(ctx, nil)
+	tags, err := deps.store.ListJavTags(ctx, nil)
 	if err != nil {
 		t.Fatalf("ListJavTags: %v", err)
 	}
@@ -1916,7 +1942,8 @@ func TestCreatedUserJavTagAppearsWithZeroCount(t *testing.T) {
 }
 
 func TestOrganizeJavTagCategoriesMatchesTraditionalAndSimplifiedNames(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	oldCategory := models.JavTagCategory{Name: "旧分类"}
 	if err := gdb.Create(&oldCategory).Error; err != nil {
@@ -1931,7 +1958,7 @@ func TestOrganizeJavTagCategoriesMatchesTraditionalAndSimplifiedNames(t *testing
 		t.Fatalf("create tags: %v", err)
 	}
 
-	result, err := OrganizeJavTagCategories(ctx, []metadata.GenreCategory{
+	result, err := deps.store.OrganizeJavTagCategories(ctx, []metadata.GenreCategory{
 		{Name: "触手", Category: "主題"},
 		{Name: "制服", Category: "服裝"},
 	})
@@ -1957,7 +1984,7 @@ func TestOrganizeJavTagCategoriesMatchesTraditionalAndSimplifiedNames(t *testing
 		}
 	}
 
-	listed, err := ListJavTags(ctx, nil)
+	listed, err := deps.store.ListJavTags(ctx, nil)
 	if err != nil {
 		t.Fatalf("ListJavTags: %v", err)
 	}
@@ -1969,7 +1996,8 @@ func TestOrganizeJavTagCategoriesMatchesTraditionalAndSimplifiedNames(t *testing
 }
 
 func TestManageAndAssignJavTagCategories(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	tags := []models.JavTag{
 		{Name: "Category Tag A"},
@@ -1979,7 +2007,7 @@ func TestManageAndAssignJavTagCategories(t *testing.T) {
 		t.Fatalf("create tags: %v", err)
 	}
 
-	category, err := CreateJavTagCategory(ctx, " 自定义 ")
+	category, err := deps.store.CreateJavTagCategory(ctx, " 自定义 ")
 	if err != nil {
 		t.Fatalf("CreateJavTagCategory: %v", err)
 	}
@@ -1989,24 +2017,24 @@ func TestManageAndAssignJavTagCategories(t *testing.T) {
 	if category.SortOrder != 0 {
 		t.Fatalf("created category sort order = %d, want 0", category.SortOrder)
 	}
-	if _, err := CreateJavTagCategory(ctx, "自定义"); err == nil {
+	if _, err := deps.store.CreateJavTagCategory(ctx, "自定义"); err == nil {
 		t.Fatal("expected duplicate category error")
 	}
-	secondCategory, err := CreateJavTagCategory(ctx, "第二个分类")
+	secondCategory, err := deps.store.CreateJavTagCategory(ctx, "第二个分类")
 	if err != nil {
 		t.Fatalf("create second category: %v", err)
 	}
 	if secondCategory.SortOrder != 1 {
 		t.Fatalf("second category sort order = %d, want 1", secondCategory.SortOrder)
 	}
-	if err := ReorderJavTagCategories(ctx, []int64{secondCategory.ID, 0, category.ID}); err != nil {
+	if err := deps.store.ReorderJavTagCategories(ctx, []int64{secondCategory.ID, 0, category.ID}); err != nil {
 		t.Fatalf("ReorderJavTagCategories: %v", err)
 	}
-	if err := ReorderJavTagCategories(ctx, []int64{secondCategory.ID, category.ID}); err == nil {
+	if err := deps.store.ReorderJavTagCategories(ctx, []int64{secondCategory.ID, category.ID}); err == nil {
 		t.Fatal("expected reorder without virtual default category to fail")
 	}
 
-	if err := AssignJavTagsCategory(ctx, []int64{tags[0].ID, tags[1].ID}, &category.ID); err != nil {
+	if err := deps.store.AssignJavTagsCategory(ctx, []int64{tags[0].ID, tags[1].ID}, &category.ID); err != nil {
 		t.Fatalf("AssignJavTagsCategory: %v", err)
 	}
 	var assigned int64
@@ -2017,10 +2045,10 @@ func TestManageAndAssignJavTagCategories(t *testing.T) {
 		t.Fatalf("assigned tag count = %d, want 2", assigned)
 	}
 
-	if err := RenameJavTagCategory(ctx, category.ID, "已修改"); err != nil {
+	if err := deps.store.RenameJavTagCategory(ctx, category.ID, "已修改"); err != nil {
 		t.Fatalf("RenameJavTagCategory: %v", err)
 	}
-	categories, err := ListJavTagCategories(ctx)
+	categories, err := deps.store.ListJavTagCategories(ctx)
 	if err != nil {
 		t.Fatalf("ListJavTagCategories: %v", err)
 	}
@@ -2031,10 +2059,10 @@ func TestManageAndAssignJavTagCategories(t *testing.T) {
 		t.Fatalf("unexpected category sort orders: %#v", categories)
 	}
 
-	if err := AssignJavTagsCategory(ctx, []int64{tags[0].ID}, nil); err != nil {
+	if err := deps.store.AssignJavTagsCategory(ctx, []int64{tags[0].ID}, nil); err != nil {
 		t.Fatalf("unassign tag category: %v", err)
 	}
-	if err := DeleteJavTagCategory(ctx, category.ID); err != nil {
+	if err := deps.store.DeleteJavTagCategory(ctx, category.ID); err != nil {
 		t.Fatalf("DeleteJavTagCategory: %v", err)
 	}
 	var categorized int64
@@ -2047,26 +2075,27 @@ func TestManageAndAssignJavTagCategories(t *testing.T) {
 }
 
 func TestDeleteJavTagCategoryPreservesVirtualDefaultPosition(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 
-	categoryA, err := CreateJavTagCategory(ctx, "A")
+	categoryA, err := deps.store.CreateJavTagCategory(ctx, "A")
 	if err != nil {
 		t.Fatalf("create category A: %v", err)
 	}
-	categoryB, err := CreateJavTagCategory(ctx, "B")
+	categoryB, err := deps.store.CreateJavTagCategory(ctx, "B")
 	if err != nil {
 		t.Fatalf("create category B: %v", err)
 	}
-	categoryC, err := CreateJavTagCategory(ctx, "C")
+	categoryC, err := deps.store.CreateJavTagCategory(ctx, "C")
 	if err != nil {
 		t.Fatalf("create category C: %v", err)
 	}
-	if err := ReorderJavTagCategories(ctx, []int64{categoryA.ID, categoryB.ID, 0, categoryC.ID}); err != nil {
+	if err := deps.store.ReorderJavTagCategories(ctx, []int64{categoryA.ID, categoryB.ID, 0, categoryC.ID}); err != nil {
 		t.Fatalf("reorder categories: %v", err)
 	}
 
-	if err := DeleteJavTagCategory(ctx, categoryA.ID); err != nil {
+	if err := deps.store.DeleteJavTagCategory(ctx, categoryA.ID); err != nil {
 		t.Fatalf("delete category A: %v", err)
 	}
 	var categories []models.JavTagCategory
@@ -2088,7 +2117,8 @@ func TestDeleteJavTagCategoryPreservesVirtualDefaultPosition(t *testing.T) {
 }
 
 func TestAttachVisibleJavTagsIncludesSimplifiedName(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 
 	javRec := models.Jav{Code: "TAG-ZH-001", Title: "Traditional tag"}
@@ -2109,7 +2139,7 @@ func TestAttachVisibleJavTagsIncludesSimplifiedName(t *testing.T) {
 	}
 
 	items := []models.Jav{{ID: javRec.ID}}
-	if err := attachVisibleJavTags(ctx, items); err != nil {
+	if err := deps.store.attachVisibleJavTags(ctx, items); err != nil {
 		t.Fatalf("attachVisibleJavTags: %v", err)
 	}
 	if len(items[0].Tags) != 1 {
@@ -2121,7 +2151,8 @@ func TestAttachVisibleJavTagsIncludesSimplifiedName(t *testing.T) {
 }
 
 func TestJavTagsFilterOutEnglishProviders(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2182,7 +2213,7 @@ func TestJavTagsFilterOutEnglishProviders(t *testing.T) {
 		t.Fatalf("create tag maps: %v", err)
 	}
 
-	zhTags, err := ListJavTags(ctx, nil)
+	zhTags, err := deps.store.ListJavTags(ctx, nil)
 	if err != nil {
 		t.Fatalf("ListJavTags zh: %v", err)
 	}
@@ -2200,7 +2231,7 @@ func TestJavTagsFilterOutEnglishProviders(t *testing.T) {
 		"Manual Only":    1,
 		"User Only":      1,
 	})
-	items, total, err := SearchJav(ctx, nil, []int64{byName["JavDB Only"].ID}, "", "code", 20, 0, nil, nil)
+	items, total, err := deps.store.SearchJav(ctx, nil, []int64{byName["JavDB Only"].ID}, "", "code", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav zh tag: %v", err)
 	}
@@ -2211,7 +2242,8 @@ func TestJavTagsFilterOutEnglishProviders(t *testing.T) {
 }
 
 func TestSaveAndUpdateJavStudioAndSeries(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2234,11 +2266,11 @@ func TestSaveAndUpdateJavStudioAndSeries(t *testing.T) {
 	if err := gdb.Create(&plainJav).Error; err != nil {
 		t.Fatalf("create jav: %v", err)
 	}
-	if err := UpdateJavStudio(ctx, plainJav.ID, "S1 No. 1 Style"); err != nil {
+	if err := deps.store.UpdateJavStudio(ctx, plainJav.ID, "S1 No. 1 Style"); err != nil {
 		t.Fatalf("update jav studio: %v", err)
 	}
 	assertJavStudio(t, gdb, "STU-002", "S1 No. 1 Style")
-	if err := UpdateJavSeries(ctx, plainJav.ID, "中年オヤジ"); err != nil {
+	if err := deps.store.UpdateJavSeries(ctx, plainJav.ID, "中年オヤジ"); err != nil {
 		t.Fatalf("update jav series: %v", err)
 	}
 	assertJavSeries(t, gdb, "STU-002", "中年オヤジ")
@@ -2252,7 +2284,8 @@ func TestSaveAndUpdateJavStudioAndSeries(t *testing.T) {
 }
 
 func TestMissingOnlyJavMetadataUpdatesDoNotOverwriteExistingValues(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2276,14 +2309,14 @@ func TestMissingOnlyJavMetadataUpdatesDoNotOverwriteExistingValues(t *testing.T)
 		t.Fatalf("create jav: %v", err)
 	}
 
-	updated, err := UpdateJavStudioIfMissing(ctx, existing.ID, "Replacement Studio")
+	updated, err := deps.store.UpdateJavStudioIfMissing(ctx, existing.ID, "Replacement Studio")
 	if err != nil {
 		t.Fatalf("update missing studio: %v", err)
 	}
 	if updated {
 		t.Fatal("UpdateJavStudioIfMissing should not update an existing studio")
 	}
-	updated, err = UpdateJavSeriesIfMissing(ctx, existing.ID, "Replacement Series")
+	updated, err = deps.store.UpdateJavSeriesIfMissing(ctx, existing.ID, "Replacement Series")
 	if err != nil {
 		t.Fatalf("update missing series: %v", err)
 	}
@@ -2314,7 +2347,8 @@ func TestMissingOnlyJavMetadataUpdatesDoNotOverwriteExistingValues(t *testing.T)
 }
 
 func TestMissingOnlyJavMetadataUpdatesFillEmptyValues(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2323,14 +2357,14 @@ func TestMissingOnlyJavMetadataUpdatesFillEmptyValues(t *testing.T) {
 		t.Fatalf("create jav: %v", err)
 	}
 
-	updated, err := UpdateJavStudioIfMissing(ctx, item.ID, "Filled Studio")
+	updated, err := deps.store.UpdateJavStudioIfMissing(ctx, item.ID, "Filled Studio")
 	if err != nil {
 		t.Fatalf("update missing studio: %v", err)
 	}
 	if !updated {
 		t.Fatal("UpdateJavStudioIfMissing should fill an empty studio")
 	}
-	updated, err = UpdateJavSeriesIfMissing(ctx, item.ID, "Filled Series")
+	updated, err = deps.store.UpdateJavSeriesIfMissing(ctx, item.ID, "Filled Series")
 	if err != nil {
 		t.Fatalf("update missing series: %v", err)
 	}
@@ -2348,7 +2382,8 @@ func TestMissingOnlyJavMetadataUpdatesFillEmptyValues(t *testing.T) {
 }
 
 func TestListJavsNeedingStudioNames(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	english := models.JavStudio{Name: "English Studio"}
 	local := models.JavStudio{Name: "本地片商"}
 	for _, record := range []any{&english, &local} {
@@ -2368,7 +2403,7 @@ func TestListJavsNeedingStudioNames(t *testing.T) {
 	if err := gdb.Create(&rows).Error; err != nil {
 		t.Fatal(err)
 	}
-	items, err := ListJavsNeedingStudioNames(context.Background())
+	items, err := deps.store.ListJavsNeedingStudioNames(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2381,7 +2416,8 @@ func TestListJavsNeedingStudioNames(t *testing.T) {
 }
 
 func TestListJavsMissingEnrichmentFields(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 	uncensored := true
@@ -2434,8 +2470,8 @@ func TestListJavsMissingEnrichmentFields(t *testing.T) {
 		list func(context.Context) ([]JavEnrichmentItem, error)
 		want []string
 	}{
-		{"series", ListJavsMissingSeries, []string{"MISS-BOTH", "MISS-SERIES", "CEN-MISS", "UNK-MISS"}},
-		{"idols", ListJavsMissingIdols, []string{"MISS-BOTH", "MISS-SERIES", "MISS-IDOLS", "CEN-MISS", "UNK-MISS"}},
+		{"series", deps.store.ListJavsMissingSeries, []string{"MISS-BOTH", "MISS-SERIES", "CEN-MISS", "UNK-MISS"}},
+		{"idols", deps.store.ListJavsMissingIdols, []string{"MISS-BOTH", "MISS-SERIES", "MISS-IDOLS", "CEN-MISS", "UNK-MISS"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			items, err := tc.list(ctx)
@@ -2460,7 +2496,8 @@ func TestListJavsMissingEnrichmentFields(t *testing.T) {
 }
 
 func TestUpdateMissingJavSeriesStudios(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2506,7 +2543,7 @@ func TestUpdateMissingJavSeriesStudios(t *testing.T) {
 		t.Fatalf("create javs: %v", err)
 	}
 
-	updated, err := UpdateMissingJavSeriesStudios(ctx)
+	updated, err := deps.store.UpdateMissingJavSeriesStudios(ctx)
 	if err != nil {
 		t.Fatalf("update missing series studios: %v", err)
 	}
@@ -2537,7 +2574,8 @@ func TestUpdateMissingJavSeriesStudios(t *testing.T) {
 }
 
 func TestSetVideoLocationJavIDAllowsStaleNoop(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	now := time.Unix(1710000000, 0).UTC()
 
 	dir := models.Directory{Path: "/tmp/media"}
@@ -2584,7 +2622,8 @@ func TestSetVideoLocationJavIDAllowsStaleNoop(t *testing.T) {
 }
 
 func TestSetVideoLocationJavIDForVideoAllowsStaleTimestampWhenUnlinked(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	now := time.Unix(1710000000, 0).UTC()
 
 	dir := models.Directory{Path: "/tmp/media"}
@@ -2633,7 +2672,8 @@ func TestSetVideoLocationJavIDForVideoAllowsStaleTimestampWhenUnlinked(t *testin
 }
 
 func TestJavBindingUsesVideoLocationsAndCountsTagWorks(t *testing.T) {
-	gdb := openTestDB(t)
+	deps := newTestDependencies()
+	gdb := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2688,7 +2728,7 @@ func TestJavBindingUsesVideoLocationsAndCountsTagWorks(t *testing.T) {
 		t.Fatalf("create locations: %v", err)
 	}
 
-	items, total, err := SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil)
+	items, total, err := deps.store.SearchJav(ctx, nil, nil, "", "code", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav: %v", err)
 	}
@@ -2709,7 +2749,7 @@ func TestJavBindingUsesVideoLocationsAndCountsTagWorks(t *testing.T) {
 		t.Fatal("expected location-backed videos to keep the original video id")
 	}
 
-	tags, err := ListJavTags(ctx, nil)
+	tags, err := deps.store.ListJavTags(ctx, nil)
 	if err != nil {
 		t.Fatalf("ListJavTags: %v", err)
 	}
@@ -2721,7 +2761,7 @@ func TestJavBindingUsesVideoLocationsAndCountsTagWorks(t *testing.T) {
 		t.Fatalf("tag count = %d, want 1", tagCounts[tag.Name])
 	}
 
-	idols, _, err := ListJavIdols(ctx, "", "work", 20, 0, nil, 0)
+	idols, _, err := deps.store.ListJavIdols(ctx, "", "work", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols: %v", err)
 	}
@@ -2734,7 +2774,8 @@ func TestJavBindingUsesVideoLocationsAndCountsTagWorks(t *testing.T) {
 }
 
 func TestGetJavIdolSummaryReturnsCoverCodeAndWorkCount(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2804,7 +2845,7 @@ func TestGetJavIdolSummaryReturnsCoverCodeAndWorkCount(t *testing.T) {
 		t.Fatalf("create extra location: %v", err)
 	}
 
-	item, err := GetJavIdolSummary(ctx, idol.ID, nil)
+	item, err := deps.store.GetJavIdolSummary(ctx, idol.ID, nil)
 	if err != nil {
 		t.Fatalf("GetJavIdolSummary: %v", err)
 	}
@@ -2817,7 +2858,8 @@ func TestGetJavIdolSummaryReturnsCoverCodeAndWorkCount(t *testing.T) {
 }
 
 func TestUpdateJavIdolCoverSelection(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2843,7 +2885,7 @@ func TestUpdateJavIdolCoverSelection(t *testing.T) {
 		t.Fatalf("reload other idol: %v", err)
 	}
 
-	soloJav := models.Jav{Code: "COV-001", Title: "Solo Cover", FetchedAt: now}
+	soloJav := models.Jav{Code: "COV-001", Title: "Solo Cover", ZhTitle: " 单人封面 ", FetchedAt: now}
 	groupJav := models.Jav{Code: "COV-002", Title: "Group Cover", FetchedAt: now}
 	otherJav := models.Jav{Code: "COV-003", Title: "Other Cover", FetchedAt: now}
 	if err := db.Create(&[]models.Jav{soloJav, groupJav, otherJav}).Error; err != nil {
@@ -2880,7 +2922,7 @@ func TestUpdateJavIdolCoverSelection(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	options, err := ListIdolCoverOptions(ctx, idol.ID, nil)
+	options, err := deps.store.ListIdolCoverOptions(ctx, idol.ID, nil)
 	if err != nil {
 		t.Fatalf("ListIdolCoverOptions: %v", err)
 	}
@@ -2893,8 +2935,14 @@ func TestUpdateJavIdolCoverSelection(t *testing.T) {
 	if options[1].Code != groupJav.Code || options[1].Solo {
 		t.Fatalf("unexpected second option: %#v", options[1])
 	}
+	if options[0].Title != soloJav.Title || options[0].ZhTitle != "单人封面" {
+		t.Fatalf("translated cover option should include both titles: %#v", options[0])
+	}
+	if options[1].Title != groupJav.Title || options[1].ZhTitle != "" {
+		t.Fatalf("untranslated cover option should retain its original title: %#v", options[1])
+	}
 
-	item, err := UpdateJavIdolCoverSelection(ctx, idol.ID, groupJav.ID, 0.25, nil)
+	item, err := deps.store.UpdateJavIdolCoverSelection(ctx, idol.ID, groupJav.ID, 0.25, nil)
 	if err != nil {
 		t.Fatalf("UpdateJavIdolCoverSelection: %v", err)
 	}
@@ -2908,11 +2956,11 @@ func TestUpdateJavIdolCoverSelection(t *testing.T) {
 		t.Fatalf("unexpected crop left: got %v want 0.25", item.CoverCropLeft)
 	}
 
-	if _, err := UpdateJavIdolCoverSelection(ctx, idol.ID, otherJav.ID, 0.2, nil); err == nil {
+	if _, err := deps.store.UpdateJavIdolCoverSelection(ctx, idol.ID, otherJav.ID, 0.2, nil); err == nil {
 		t.Fatalf("expected invalid cover jav error")
 	}
 
-	item, err = UpdateJavIdolCoverSelection(ctx, idol.ID, 0, 0, nil)
+	item, err = deps.store.UpdateJavIdolCoverSelection(ctx, idol.ID, 0, 0, nil)
 	if err != nil {
 		t.Fatalf("reset cover selection: %v", err)
 	}
@@ -2928,7 +2976,8 @@ func TestUpdateJavIdolCoverSelection(t *testing.T) {
 }
 
 func TestSearchJavSortByDurationDesc(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -2979,7 +3028,7 @@ func TestSearchJavSortByDurationDesc(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	items, total, err := SearchJav(ctx, nil, nil, "", "duration", 20, 0, nil, nil)
+	items, total, err := deps.store.SearchJav(ctx, nil, nil, "", "duration", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav: %v", err)
 	}
@@ -2996,7 +3045,7 @@ func TestSearchJavSortByDurationDesc(t *testing.T) {
 		t.Fatalf("unexpected second jav: got %d want %d", items[1].ID, shortJav.ID)
 	}
 
-	items, total, err = SearchJav(ctx, nil, nil, "", "duration_asc", 20, 0, nil, nil)
+	items, total, err = deps.store.SearchJav(ctx, nil, nil, "", "duration_asc", 20, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("SearchJav duration_asc: %v", err)
 	}
@@ -3015,7 +3064,8 @@ func TestSearchJavSortByDurationDesc(t *testing.T) {
 }
 
 func TestListJavIdolsSortByAgeDirections(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 	oldBirth := time.Date(1988, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -3075,7 +3125,7 @@ func TestListJavIdolsSortByAgeDirections(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	items, total, err := ListJavIdols(ctx, "", "birth", 20, 0, nil, 0)
+	items, total, err := deps.store.ListJavIdols(ctx, "", "birth", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols birth: %v", err)
 	}
@@ -3086,7 +3136,7 @@ func TestListJavIdolsSortByAgeDirections(t *testing.T) {
 		t.Fatalf("unexpected birth first idol: got %d want %d", items[0].ID, youngIdol.ID)
 	}
 
-	items, total, err = ListJavIdols(ctx, "", "birth_asc", 20, 0, nil, 0)
+	items, total, err = deps.store.ListJavIdols(ctx, "", "birth_asc", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols birth_asc: %v", err)
 	}
@@ -3099,7 +3149,8 @@ func TestListJavIdolsSortByAgeDirections(t *testing.T) {
 }
 
 func TestListJavIdolsFiltersProfileRanges(t *testing.T) {
-	database := openTestDB(t)
+	deps := newTestDependencies()
+	database := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Now().UTC()
 	targetBirth := now.AddDate(-30, -1, 0)
@@ -3160,7 +3211,7 @@ func TestListJavIdolsFiltersProfileRanges(t *testing.T) {
 		createVideoLocationsForVideos(t, database, video)
 	}
 
-	items, total, err := ListJavIdols(ctx, "", "", 20, 0, nil, 0, JavIdolFilters{
+	items, total, err := deps.store.ListJavIdols(ctx, "", "", 20, 0, nil, 0, JavIdolFilters{
 		Height: JavIdolIntRange{Min: intPtr(160), Max: intPtr(170)},
 		Age:    JavIdolIntRange{Min: intPtr(29), Max: intPtr(31)},
 		Cup:    JavIdolIntRange{Min: intPtr(4), Max: intPtr(6)},
@@ -3177,7 +3228,8 @@ func TestListJavIdolsFiltersProfileRanges(t *testing.T) {
 }
 
 func TestListJavIdolsSortByRecentDirections(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -3234,7 +3286,7 @@ func TestListJavIdolsSortByRecentDirections(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	items, total, err := ListJavIdols(ctx, "", "recent", 20, 0, nil, 0)
+	items, total, err := deps.store.ListJavIdols(ctx, "", "recent", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols recent: %v", err)
 	}
@@ -3245,7 +3297,7 @@ func TestListJavIdolsSortByRecentDirections(t *testing.T) {
 		t.Fatalf("unexpected recent first idol: got %d want %d", items[0].ID, newIdol.ID)
 	}
 
-	items, total, err = ListJavIdols(ctx, "", "recent_asc", 20, 0, nil, 0)
+	items, total, err = deps.store.ListJavIdols(ctx, "", "recent_asc", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols recent_asc: %v", err)
 	}
@@ -3258,7 +3310,8 @@ func TestListJavIdolsSortByRecentDirections(t *testing.T) {
 }
 
 func TestListJavIdolsSortByLatestFileModifiedTime(t *testing.T) {
-	database := openTestDB(t)
+	deps := newTestDependencies()
+	database := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -3298,7 +3351,7 @@ func TestListJavIdolsSortByLatestFileModifiedTime(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, database, videos...)
 
-	items, total, err := ListJavIdols(ctx, "", "modified", 20, 0, nil, 0)
+	items, total, err := deps.store.ListJavIdols(ctx, "", "modified", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols modified: %v", err)
 	}
@@ -3306,7 +3359,7 @@ func TestListJavIdolsSortByLatestFileModifiedTime(t *testing.T) {
 		t.Fatalf("modified idol order = %#v total=%d, want latest file idol first", items, total)
 	}
 
-	items, total, err = ListJavIdols(ctx, "", "modified_asc", 20, 0, nil, 0)
+	items, total, err = deps.store.ListJavIdols(ctx, "", "modified_asc", 20, 0, nil, 0)
 	if err != nil {
 		t.Fatalf("ListJavIdols modified_asc: %v", err)
 	}
@@ -3316,7 +3369,8 @@ func TestListJavIdolsSortByLatestFileModifiedTime(t *testing.T) {
 }
 
 func TestUpdateJavStudioProfileUpdatesAliasesAndResolvesScrapedName(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -3345,7 +3399,7 @@ func TestUpdateJavStudioProfileUpdatesAliasesAndResolvesScrapedName(t *testing.T
 	}
 	createVideoLocationsForVideos(t, db, video)
 
-	updated, err := UpdateJavStudioProfile(ctx, studio.ID, JavStudioUpdateInput{
+	updated, err := deps.store.UpdateJavStudioProfile(ctx, studio.ID, JavStudioUpdateInput{
 		Name:    "Main Studio",
 		Aliases: []string{"Alias Studio", "Main Studio", "Alias Studio"},
 	}, nil)
@@ -3359,7 +3413,7 @@ func TestUpdateJavStudioProfileUpdatesAliasesAndResolvesScrapedName(t *testing.T
 		t.Fatalf("studio aliases = %#v, want Alias Studio", updated.Aliases)
 	}
 
-	items, total, err := ListJavStudios(ctx, "Alias Studio", 20, 0, nil)
+	items, total, err := deps.store.ListJavStudios(ctx, "Alias Studio", 20, 0, nil)
 	if err != nil {
 		t.Fatalf("ListJavStudios by alias: %v", err)
 	}
@@ -3367,7 +3421,7 @@ func TestUpdateJavStudioProfileUpdatesAliasesAndResolvesScrapedName(t *testing.T
 		t.Fatalf("unexpected studio alias search: total=%d items=%#v", total, items)
 	}
 
-	rec, err := SaveJavInfo(ctx, &metadata.JavInfo{
+	rec, err := deps.store.SaveJavInfo(ctx, &metadata.JavInfo{
 		Code:     "STU-EDIT-002",
 		Title:    "Alias scraped studio",
 		Studio:   "Alias Studio",
@@ -3376,14 +3430,15 @@ func TestUpdateJavStudioProfileUpdatesAliasesAndResolvesScrapedName(t *testing.T
 	if err != nil {
 		t.Fatalf("SaveJavInfo alias: %v", err)
 	}
-	if updated, err := UpdateJavStudioIfMissing(ctx, rec.ID, "Alias Studio"); err != nil || !updated {
+	if updated, err := deps.store.UpdateJavStudioIfMissing(ctx, rec.ID, "Alias Studio"); err != nil || !updated {
 		t.Fatalf("fill studio by alias: updated=%v err=%v", updated, err)
 	}
 	assertJavStudio(t, db, "STU-EDIT-002", "Main Studio")
 }
 
 func TestMergeJavStudiosMovesWorksSeriesFavoritesAndAliases(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -3437,7 +3492,7 @@ func TestMergeJavStudiosMovesWorksSeriesFavoritesAndAliases(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	updated, err := MergeJavStudios(ctx, canonical.ID, []int64{source.ID}, nil)
+	updated, err := deps.store.MergeJavStudios(ctx, canonical.ID, []int64{source.ID}, nil)
 	if err != nil {
 		t.Fatalf("MergeJavStudios: %v", err)
 	}
@@ -3476,7 +3531,8 @@ func TestMergeJavStudiosMovesWorksSeriesFavoritesAndAliases(t *testing.T) {
 }
 
 func TestMergeJavIdolsMovesRelationshipsAndAliases(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -3535,7 +3591,7 @@ func TestMergeJavIdolsMovesRelationshipsAndAliases(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, videos...)
 
-	updated, err := MergeJavIdols(ctx, canonical.ID, []int64{source.ID}, nil)
+	updated, err := deps.store.MergeJavIdols(ctx, canonical.ID, []int64{source.ID}, nil)
 	if err != nil {
 		t.Fatalf("MergeJavIdols: %v", err)
 	}
@@ -3578,7 +3634,8 @@ func TestMergeJavIdolsMovesRelationshipsAndAliases(t *testing.T) {
 }
 
 func TestMergeJavIdolsOnlyUsesSourceNameAsAlias(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 
@@ -3611,7 +3668,7 @@ func TestMergeJavIdolsOnlyUsesSourceNameAsAlias(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, video)
 
-	if _, err := MergeJavIdols(ctx, canonical.ID, []int64{source.ID}, nil); err != nil {
+	if _, err := deps.store.MergeJavIdols(ctx, canonical.ID, []int64{source.ID}, nil); err != nil {
 		t.Fatalf("MergeJavIdols: %v", err)
 	}
 
@@ -3640,7 +3697,8 @@ func TestMergeJavIdolsOnlyUsesSourceNameAsAlias(t *testing.T) {
 }
 
 func TestSaveJavInfoUsesIdolAliasInsteadOfCreatingDuplicate(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 
 	idol := models.JavIdol{Name: "Main Idol"}
@@ -3651,7 +3709,7 @@ func TestSaveJavInfoUsesIdolAliasInsteadOfCreatingDuplicate(t *testing.T) {
 		t.Fatalf("create alias: %v", err)
 	}
 
-	_, err := SaveJavInfo(ctx, &metadata.JavInfo{
+	_, err := deps.store.SaveJavInfo(ctx, &metadata.JavInfo{
 		Code:     "ALS-001",
 		Title:    "Alias Work",
 		Actors:   []string{"Alias Idol"},
@@ -3672,7 +3730,8 @@ func TestSaveJavInfoUsesIdolAliasInsteadOfCreatingDuplicate(t *testing.T) {
 }
 
 func TestUpdateJavIdolUpdatesProfileAndAliases(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 	now := time.Unix(1710000000, 0).UTC()
 	birth := time.Date(1998, 4, 3, 0, 0, 0, 0, time.UTC)
@@ -3701,7 +3760,7 @@ func TestUpdateJavIdolUpdatesProfileAndAliases(t *testing.T) {
 	}
 	createVideoLocationsForVideos(t, db, video)
 
-	updated, err := UpdateJavIdol(ctx, idol.ID, JavIdolUpdateInput{
+	updated, err := deps.store.UpdateJavIdol(ctx, idol.ID, JavIdolUpdateInput{
 		Name:         "New Idol",
 		RomanName:    "New Roman",
 		JapaneseName: "新しい女優",
@@ -3735,7 +3794,7 @@ func TestUpdateJavIdolUpdatesProfileAndAliases(t *testing.T) {
 		t.Fatalf("old alias still exists")
 	}
 
-	_, err = SaveJavInfo(ctx, &metadata.JavInfo{
+	_, err = deps.store.SaveJavInfo(ctx, &metadata.JavInfo{
 		Code:     "EDT-002",
 		Title:    "Alias Scraped Work",
 		Actors:   []string{"New Alias"},
@@ -3748,7 +3807,8 @@ func TestUpdateJavIdolUpdatesProfileAndAliases(t *testing.T) {
 }
 
 func TestSetJavSampleImagesIfEmpty(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 
 	item := models.Jav{Code: "SAMPLE-001", Title: "Sample images"}
@@ -3756,7 +3816,7 @@ func TestSetJavSampleImagesIfEmpty(t *testing.T) {
 		t.Fatalf("create jav: %v", err)
 	}
 
-	first, err := SetJavSampleImagesIfEmpty(ctx, item.ID, models.JavSampleImages{
+	first, err := deps.store.SetJavSampleImagesIfEmpty(ctx, item.ID, models.JavSampleImages{
 		{
 			ThumbnailURL: " https://example.com/thumb-1.jpg ",
 			DetailURL:    "https://example.com/detail-1.jpg",
@@ -3786,7 +3846,7 @@ func TestSetJavSampleImagesIfEmpty(t *testing.T) {
 		t.Fatalf("first sample images = %#v, want %#v", first, want)
 	}
 
-	second, err := SetJavSampleImagesIfEmpty(ctx, item.ID, models.JavSampleImages{
+	second, err := deps.store.SetJavSampleImagesIfEmpty(ctx, item.ID, models.JavSampleImages{
 		{
 			ThumbnailURL: "https://example.com/replacement-thumb.jpg",
 			DetailURL:    "https://example.com/replacement-detail.jpg",
@@ -3809,10 +3869,11 @@ func TestSetJavSampleImagesIfEmpty(t *testing.T) {
 }
 
 func TestSaveJavInfoDoesNotWriteSampleImages(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 
-	_, err := SaveJavInfo(ctx, &metadata.JavInfo{
+	_, err := deps.store.SaveJavInfo(ctx, &metadata.JavInfo{
 		Code:     "SAMPLE-SCAN-001",
 		Title:    "Scanned metadata",
 		Provider: metadata.ProviderJavBus,
@@ -3837,11 +3898,11 @@ func TestSaveJavInfoDoesNotWriteSampleImages(t *testing.T) {
 		ThumbnailURL: "https://lazy.example/thumb.jpg",
 		DetailURL:    "https://lazy.example/detail.jpg",
 	}}
-	if _, err := SetJavSampleImagesIfEmpty(ctx, stored.ID, want); err != nil {
+	if _, err := deps.store.SetJavSampleImagesIfEmpty(ctx, stored.ID, want); err != nil {
 		t.Fatalf("SetJavSampleImagesIfEmpty: %v", err)
 	}
 
-	_, err = SaveJavInfo(ctx, &metadata.JavInfo{
+	_, err = deps.store.SaveJavInfo(ctx, &metadata.JavInfo{
 		Code:     "SAMPLE-SCAN-001",
 		Title:    "Refreshed metadata",
 		Provider: metadata.ProviderJavBus,
@@ -3867,14 +3928,15 @@ func TestSaveJavInfoDoesNotWriteSampleImages(t *testing.T) {
 }
 
 func TestMarkJavSampleImagesNotFound(t *testing.T) {
-	db := openTestDB(t)
+	deps := newTestDependencies()
+	db := openTestDB(deps, t)
 	ctx := context.Background()
 
 	item := models.Jav{Code: "SAMPLE-MISS-001", Title: "Missing sample images"}
 	if err := db.Create(&item).Error; err != nil {
 		t.Fatalf("create jav: %v", err)
 	}
-	if err := MarkJavSampleImagesNotFound(ctx, item.ID); err != nil {
+	if err := deps.store.MarkJavSampleImagesNotFound(ctx, item.ID); err != nil {
 		t.Fatalf("MarkJavSampleImagesNotFound: %v", err)
 	}
 
@@ -3890,7 +3952,7 @@ func TestMarkJavSampleImagesNotFound(t *testing.T) {
 		ThumbnailURL: "https://example.com/thumb.jpg",
 		DetailURL:    "https://example.com/detail.jpg",
 	}}
-	images, err := SetJavSampleImagesIfEmpty(ctx, item.ID, want)
+	images, err := deps.store.SetJavSampleImagesIfEmpty(ctx, item.ID, want)
 	if err != nil {
 		t.Fatalf("SetJavSampleImagesIfEmpty: %v", err)
 	}
@@ -3905,7 +3967,7 @@ func TestMarkJavSampleImagesNotFound(t *testing.T) {
 	}
 }
 
-func openTestDB(t *testing.T) *gorm.DB {
+func openTestDB(deps *testDependencies, t *testing.T) *gorm.DB {
 	t.Helper()
 
 	dbPath := filepath.Join(t.TempDir(), "test.db")
@@ -3914,10 +3976,11 @@ func openTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("open test db: %v", err)
 	}
 
-	prevDB := common.DB
-	common.DB = db
+	deps.database = db
+	deps.bindDatabase()
+
 	t.Cleanup(func() {
-		common.DB = prevDB
+
 		sqlDB, err := db.DB()
 		if err == nil {
 			_ = sqlDB.Close()

@@ -9,7 +9,7 @@ $Repo = if ($env:JAVBOSS_INSTALL_REPO) {
 $Version = if ($env:JAVBOSS_INSTALL_VERSION) {
   "$env:JAVBOSS_INSTALL_VERSION".Trim()
 } else {
-  "v2.1.2"
+  "v2.1.3"
 }
 
 function Test-PrefersChinese {

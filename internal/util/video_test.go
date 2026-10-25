@@ -177,7 +177,9 @@ func TestFindFFmpegPathUsesPersistentDataTool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find FFmpeg: %v", err)
 	}
-	if filepath.Clean(got) != filepath.Clean(ffmpegPath) {
+	gotInfo, gotErr := os.Stat(got)
+	wantInfo, wantErr := os.Stat(ffmpegPath)
+	if gotErr != nil || wantErr != nil || !os.SameFile(gotInfo, wantInfo) {
 		t.Fatalf("findFFmpegPath() = %q, want %q", got, ffmpegPath)
 	}
 }
