@@ -516,6 +516,7 @@ func playVideoFile(c *gin.Context) {
 }
 
 var openSystemPlaylist = util.OpenPlaylist
+var playMPVPlaylistFrom = mpv.PlayPlaylistFrom
 
 // playVideoPlaylist accepts ordered items (video_id, optional location_id) and
 // player: "mpv" (default) or "system" (local access, opens an M3U8 playlist).
@@ -528,6 +529,10 @@ func playVideoPlaylist(c *gin.Context) {
 	var req videoPlaylistRequest
 	if err := c.ShouldBindJSON(&req); err != nil || len(req.Items) == 0 {
 		respondLocalizedError(c, http.StatusBadRequest, "播放列表请求无效", "Invalid playlist request")
+		return
+	}
+	if req.StartIndex < 0 || req.StartIndex >= len(req.Items) {
+		respondLocalizedError(c, http.StatusBadRequest, "播放列表起始位置无效", "Invalid playlist start index")
 		return
 	}
 
@@ -616,7 +621,7 @@ func playVideoPlaylist(c *gin.Context) {
 		return
 	}
 
-	if err := mpv.PlayPlaylist(items); err != nil {
+	if err := playMPVPlaylistFrom(items, req.StartIndex); err != nil {
 		logging.Error("play video playlist error: %v", err)
 		if strings.Contains(err.Error(), "mpv not found") {
 			respondLocalizedError(c, http.StatusServiceUnavailable, "未找到 MPV 播放器", err.Error())
@@ -1294,8 +1299,9 @@ type videoPlaylistItemRequest struct {
 }
 
 type videoPlaylistRequest struct {
-	Player string                     `json:"player"`
-	Items  []videoPlaylistItemRequest `json:"items"`
+	Player     string                     `json:"player"`
+	Items      []videoPlaylistItemRequest `json:"items"`
+	StartIndex int                        `json:"start_index"`
 }
 
 func resolveVideoPathFromBody(c *gin.Context) (string, string, error) {
