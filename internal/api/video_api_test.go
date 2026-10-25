@@ -15,6 +15,7 @@ import (
 	dbpkg "javboss/internal/db"
 	"javboss/internal/jav/scrape"
 	"javboss/internal/models"
+	"javboss/internal/mpv"
 	"javboss/internal/util"
 
 	"github.com/gin-gonic/gin"
@@ -690,5 +691,87 @@ func TestSystemPlaylistResolvesSelectedLocationsBeforeOpening(t *testing.T) {
 				t.Fatalf("invalid playlist opened: %v", opened)
 			}
 		})
+	}
+}
+
+func TestMPVPlaylistPreservesSelectedStartIndex(t *testing.T) {
+	deps := newTestDependencies()
+	t.Setenv("JAVBOSS_CONTAINER", "false")
+	dirPath := t.TempDir()
+	database, err := dbpkg.Open(filepath.Join(dirPath, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	previousPlay := playMPVPlaylistFrom
+	deps.database = database
+	deps.bindDatabase(t)
+	t.Cleanup(func() {
+		playMPVPlaylistFrom = previousPlay
+		if sqlDB, dbErr := database.DB(); dbErr == nil {
+			_ = sqlDB.Close()
+		}
+	})
+
+	dir := models.Directory{Path: dirPath}
+	if err := database.Create(&dir).Error; err != nil {
+		t.Fatal(err)
+	}
+	items := make([]videoPlaylistItemRequest, 0, 3)
+	for index, name := range []string{"first.mp4", "second.mp4", "third.mp4"} {
+		video := models.Video{Fingerprint: "playlist-start-" + strconv.Itoa(index)}
+		if err := database.Create(&video).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dirPath, name), []byte("video"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		location, err := dbpkg.Default().UpsertVideoLocation(
+			context.Background(), video.ID, dir.ID, name, time.Now(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		items = append(items, videoPlaylistItemRequest{VideoID: video.ID, LocationID: location.ID})
+	}
+
+	var capturedItems []mpv.PlaylistItem
+	capturedStartIndex := -1
+	playMPVPlaylistFrom = func(items []mpv.PlaylistItem, startIndex int) error {
+		capturedItems = items
+		capturedStartIndex = startIndex
+		return nil
+	}
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/videos/playlist", playVideoPlaylist)
+	body, err := json.Marshal(videoPlaylistRequest{
+		Player: "mpv", Items: items, StartIndex: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/videos/playlist", strings.NewReader(string(body)))
+	req.RemoteAddr = "127.0.0.1:1234"
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d, want %d: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if capturedStartIndex != 2 {
+		t.Fatalf("start index = %d, want 2", capturedStartIndex)
+	}
+	if len(capturedItems) != 3 || filepath.Base(capturedItems[2].Path) != "third.mp4" {
+		t.Fatalf("unexpected playlist items: %#v", capturedItems)
+	}
+
+	invalidBody := strings.NewReader(`{"player":"mpv","start_index":3,"items":[{"video_id":1}]}`)
+	invalidReq := httptest.NewRequest(http.MethodPost, "/videos/playlist", invalidBody)
+	invalidReq.RemoteAddr = "127.0.0.1:1234"
+	invalidResponse := httptest.NewRecorder()
+	router.ServeHTTP(invalidResponse, invalidReq)
+	if invalidResponse.Code != http.StatusBadRequest {
+		t.Fatalf("invalid start index status = %d, want %d", invalidResponse.Code, http.StatusBadRequest)
 	}
 }
