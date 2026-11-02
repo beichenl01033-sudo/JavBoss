@@ -18,6 +18,7 @@ export function createVideoSettingsDraft(state) {
     videoSortInput: sortOrder,
     videoHideJavInput: videoHideJav,
     videoWaterfallDefaultInput: configFlag(config?.video_waterfall_default),
+    videoShowDirectoryBarInput: configFlag(config?.video_show_directory_bar, true),
   }
 }
 

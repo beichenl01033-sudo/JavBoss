@@ -185,6 +185,7 @@ export default function App() {
     pendingScrollRestoreRef,
     saveScrollBeforeUrlStateChange,
     schedulePendingScrollRestore,
+    switchLibraryTab,
     buildVideoUrl,
     buildJavUrl,
   } = useLibraryRoute({ setJavSearchInput, setSearchInput, configLoaded })
@@ -370,11 +371,6 @@ export default function App() {
     setTagModalApplyMode('replace')
     setTagModalOpen(true)
   }, [loadTags])
-  const handleOpenTagFilterEditor = useCallback(() => {
-    loadTags()
-    setTagModalApplyMode('append')
-    setTagModalOpen(true)
-  }, [loadTags])
 
   const {
     idolFavoriteModalOpen,
@@ -460,6 +456,7 @@ export default function App() {
     forceReloadVideos,
     saveScrollBeforeUrlStateChange,
     applyJavTagFilter,
+    switchLibraryTab,
   })
 
   const {
@@ -541,7 +538,6 @@ export default function App() {
         }
         canGoBack={browserNavigation.canGoBack}
         canGoForward={browserNavigation.canGoForward}
-        isJavMode={isJavMode}
         javPrefix={javPrefix}
         directoryId={selectedDirectoryId}
         onBrowserBack={handleBrowserBack}
@@ -551,11 +547,11 @@ export default function App() {
         onOpenDisplaySettings={openDisplaySettings}
         onOpenJavTagModal={handleOpenJavTagModal}
         onJavPrefixClick={handleSelectJavPrefix}
-        onOpenTagModal={handleOpenTagModal}
         onSelectTab={handleSelectSideTab}
         showDirectorySetupHint={showDirectorySetupHint}
       />
       <TopBar
+        onOpenVideoTags={handleOpenTagModal}
         buildFavoriteGroupUrl={(groupId) => {
           const parsedGroupId = Number(groupId)
           const targetGroupId =
@@ -632,14 +628,12 @@ export default function App() {
           setIdolFavoriteManageOpen(true)
         }}
         onOpenFilterEditor={
-          isJavMode
-            ? javTab === 'list'
-              ? () => {
-                  setJavQueryEditorOpen(true)
-                  loadJavTags()
-                }
-              : null
-            : handleOpenTagFilterEditor
+          isJavMode && javTab === 'list'
+            ? () => {
+                setJavQueryEditorOpen(true)
+                loadJavTags()
+              }
+            : null
         }
         onOpenSelectionOps={isJavMode ? javSelection.openOps : () => setSelectionOpsOpen(true)}
         onClearSelection={isJavMode ? javSelection.clear : clearSelection}

@@ -177,9 +177,16 @@ func TestFindFFmpegPathUsesPersistentDataTool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find FFmpeg: %v", err)
 	}
-	gotInfo, gotErr := os.Stat(got)
-	wantInfo, wantErr := os.Stat(ffmpegPath)
-	if gotErr != nil || wantErr != nil || !os.SameFile(gotInfo, wantInfo) {
+	gotInfo, err := os.Stat(got)
+	if err != nil {
+		t.Fatalf("stat resolved FFmpeg: %v", err)
+	}
+	wantInfo, err := os.Stat(ffmpegPath)
+	if err != nil {
+		t.Fatalf("stat FFmpeg fixture: %v", err)
+	}
+	// os.Getwd may return /private/var while TempDir uses /var on macOS.
+	if !os.SameFile(gotInfo, wantInfo) {
 		t.Fatalf("findFFmpegPath() = %q, want %q", got, ffmpegPath)
 	}
 }

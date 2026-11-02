@@ -29,7 +29,13 @@ import (
 
 // listVideos accepts sort=watched (longest first) or watched_asc (shortest first)
 // for cumulative watch time; legacy play_count sort values are aliases.
+// directory_id selects an enabled library root. subdirectory is a relative directory
+// within that root; it includes all descendants and requires directory_id.
 func listVideos(c *gin.Context) {
+	directoryIDs, subdirectory, valid := parseVideoDirectoryFilter(c)
+	if !valid {
+		return
+	}
 	limit := queryInt(c, "limit", 100)
 	offset := queryInt(c, "offset", 0)
 	tagFilter := parseTagQuery(c.Query("tags"))
@@ -51,14 +57,14 @@ func listVideos(c *gin.Context) {
 		seed = &parsed
 	}
 
-	videos, err := dbpkg.Default().ListVideos(c.Request.Context(), limit, offset, tagFilter, search, sort, seed, directoryIDs, hideJav)
+	videos, err := dbpkg.Default().ListVideos(c.Request.Context(), limit, offset, tagFilter, search, sort, seed, directoryIDs, dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory})
 	if err != nil {
 		logging.Error("list videos error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载视频列表失败", "Failed to load videos")
 		return
 	}
 
-	total, err := dbpkg.Default().CountVideos(c.Request.Context(), tagFilter, search, directoryIDs, hideJav)
+	total, err := dbpkg.Default().CountVideos(c.Request.Context(), tagFilter, search, directoryIDs, dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory})
 	if err != nil {
 		logging.Error("count videos error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "统计视频数量失败", "Failed to count videos")
@@ -1371,7 +1377,7 @@ func incrementPlayCountByPath(ctx context.Context, dirPath, fullPath string) {
 		return
 	}
 	relPath = filepath.ToSlash(filepath.Clean(relPath))
-	if relPath == "." || strings.HasPrefix(relPath, "..") {
+	if relPath == "." || relPath == ".." || strings.HasPrefix(relPath, "../") {
 		return
 	}
 	if err := dbpkg.Default().IncrementVideoPlayCountByPath(ctx, dirPath, relPath); err != nil {
@@ -1400,7 +1406,7 @@ func resolvePlaybackVideoID(ctx context.Context, requestedID int64, dirPath, ful
 		return 0
 	}
 	relPath = filepath.ToSlash(filepath.Clean(relPath))
-	if relPath == "." || strings.HasPrefix(relPath, "..") {
+	if relPath == "." || relPath == ".." || strings.HasPrefix(relPath, "../") {
 		return 0
 	}
 	videoID, err := dbpkg.Default().GetVideoIDByPath(ctx, dirPath, relPath)

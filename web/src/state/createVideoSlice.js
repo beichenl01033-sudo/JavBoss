@@ -47,6 +47,20 @@ export function createVideoSlice({ set, get, lists }) {
     selectedVideoMeta: {},
     searchTerm: '',
     selectedDirectoryId: null,
+    videoDirectoryId: null,
+    videoSubdirectory: '',
+    setVideoDirectoryFilter: (directory) =>
+      set({
+        selectedDirectoryId: directory?.directory_id || null,
+        videoDirectoryId: directory?.directory_id || null,
+        videoSubdirectory: directory?.path || '',
+        searchTerm: '',
+        selectedTags: [],
+        randomMode: false,
+        randomSeed: null,
+        videoTempSort: '',
+        page: 1,
+      }),
     sortOrder: 'recent',
     videoTempSort: '',
     randomMode: false,
@@ -95,7 +109,11 @@ export function createVideoSlice({ set, get, lists }) {
       const selectedDirectoryId = Number.isFinite(parsed) && parsed > 0 ? parsed : null
       get().invalidateTagRequests()
       get().invalidateFavoriteRequests()
-      set({ selectedDirectoryId, ...directoryScopeResetState() })
+      set({
+        ...directoryScopeResetState(),
+        selectedDirectoryId,
+        videoDirectoryId: selectedDirectoryId,
+      })
     },
     toggleTagFilter: (tagName) => {
       const { selectedTags } = get()
@@ -103,7 +121,12 @@ export function createVideoSlice({ set, get, lists }) {
       const next = exists ? selectedTags.filter((t) => t !== tagName) : [...selectedTags, tagName]
       set({ selectedTags: next, videoTempSort: '', page: 1 })
     },
-    clearFilters: () => set({ selectedTags: [], videoTempSort: '', page: 1 }),
+    clearFilters: () =>
+      set({
+        selectedTags: [],
+        videoTempSort: '',
+        page: 1,
+      }),
     toggleSelectVideo: (video) => {
       const key = videoSelectionKey(video)
       if (!video || !video.id || !key) return

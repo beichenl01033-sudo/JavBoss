@@ -9,6 +9,7 @@ export async function fetchVideos({
   seed = null,
   directoryId = null,
   hideJav = false,
+  subdirectory = '',
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -16,9 +17,12 @@ export async function fetchVideos({
   params.set('offset', String(offset))
   if (tags.length) params.set('tags', tags.join(','))
   if (search) params.set('search', search)
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   if (sort) params.set('sort', sort)
   if (seed != null) params.set('seed', String(seed))
-  if (directoryId != null) params.set('directory_id', String(directoryId))
   params.set('hide_jav', hideJav ? '1' : '0')
   const res = await apiFetch(`/videos?${params.toString()}`, { signal })
   if (!res.ok) throw await apiError(res)
@@ -182,4 +186,17 @@ export async function deleteVideoLocation(videoId, locationId) {
   if (!res.ok) {
     throw await apiError(res)
   }
+}
+
+// Resolve root paths once at the API boundary so tree consumers keep the same shape.
+export async function fetchVideoDirectories({ signal } = {}) {
+  const res = await apiFetch('/videos/directories', { signal })
+  if (!res.ok) throw await apiError(res)
+  const data = await res.json()
+  return Array.isArray(data?.items)
+    ? data.items.map((item) => ({
+        ...item,
+        directory_path: data.directory_paths?.[item.directory_id] ?? item.directory_path,
+      }))
+    : []
 }
