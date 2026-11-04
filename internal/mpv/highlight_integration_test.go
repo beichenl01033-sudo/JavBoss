@@ -113,4 +113,63 @@ func TestHighlightNavigationAndPreviewWithMPV(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitMPVTestProperty(t, endpoint, "user-data/javboss/highlight-count", float64(0))
+	if err := os.WriteFile(path, []byte(`{"version":1,"items":[{"time":4,"label":"next video"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Three real playlist rows, including two distinct entries for the same path.
+	rows := []PlaylistItem{items[0], items[0], items[1]}
+	for i := range rows {
+		rows[i].Options.HighlightPreviewSeconds = 0
+	}
+	rows[0].Highlight = &PlaylistHighlight{VideoID: 910, VideoTitle: "Video A", Time: 0, Label: "first", Number: 1}
+	rows[1].Highlight = &PlaylistHighlight{VideoID: 910, VideoTitle: "Video A", Time: 2, Label: "second", Number: 2}
+	rows[1].Options.StartTimeSec = 2
+	rows[2].Highlight = &PlaylistHighlight{VideoID: 911, VideoTitle: "Video B", Time: 4, Label: "third", Number: 1}
+	for i := range rows {
+		rows[i].Title = rows[i].Highlight.VideoTitle + " - " + rows[i].Highlight.Label
+	}
+	if err := session.PlayPlaylistFrom(rows, 1); err != nil {
+		t.Fatal(err)
+	}
+	command("set_property", "pause", true)
+	waitMPVTestProperty(t, endpoint, "playlist-count", float64(3))
+	waitMPVTestProperty(t, endpoint, "playlist-pos", float64(1))
+	position(1.7, 3)
+	metadata := readMPVTestProperty(t, endpoint, "user-data/javboss/playlist-highlights").(map[string]any)
+	if len(metadata) != 3 {
+		t.Fatalf("point metadata lost duplicate path: %v", metadata)
+	}
+	command("script-message-to", "javboss_control", "previous-highlight")
+	waitMPVTestProperty(t, endpoint, "playlist-pos", float64(0))
+	position(0, 1)
+	// Jump over an arbitrary row, then move back across a video boundary.
+	command("playlist-play-index", 2)
+	waitMPVTestProperty(t, endpoint, "playlist-pos", float64(2))
+	position(3.7, 5)
+	command("script-message-to", "javboss_control", "previous-highlight")
+	waitMPVTestProperty(t, endpoint, "playlist-pos", float64(1))
+	position(1.7, 3)
+	// Clicking the per-video highlight sidebar selects the matching playlist row.
+	command("script-message-to", "javboss_control", "seek-highlight", "1")
+	waitMPVTestProperty(t, endpoint, "playlist-pos", float64(0))
+	for i := range rows {
+		rows[i].Options.HighlightPreviewSeconds = 0.4
+	}
+	if err := session.PlayPlaylistFrom(rows, 0); err != nil {
+		t.Fatal(err)
+	}
+	waitMPVTestProperty(t, endpoint, "playlist-pos", float64(2))
+	waitMPVTestProperty(t, endpoint, "pause", true)
+	position(3.7, 5.5)
+	// Returning to an ordinary playlist clears all point metadata and titles.
+	normal := items[0]
+	normal.Options.HighlightMode = false
+	normal.Options.HighlightPreviewSeconds = 0
+	if err := session.PlayPlaylistFrom([]PlaylistItem{normal}, 0); err != nil {
+		t.Fatal(err)
+	}
+	metadata = readMPVTestProperty(t, endpoint, "user-data/javboss/playlist-highlights").(map[string]any)
+	if len(metadata) != 0 {
+		t.Fatal("ordinary playlist inherited point metadata")
+	}
 }

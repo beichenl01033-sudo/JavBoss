@@ -42,11 +42,22 @@ type PlayOptions struct {
 
 // PlaylistItem describes one file in an MPV playlist.
 type PlaylistItem struct {
-	Path    string
-	Title   string
-	Options PlayOptions
+	Path      string
+	Title     string
+	Options   PlayOptions
+	Highlight *PlaylistHighlight
 	// OnStarted runs once per successful playback of this entry, including replays.
 	OnStarted func()
+}
+
+// PlaylistHighlight identifies a point, even when several entries load the same
+// video path. Native playlist entry IDs keep titles, seeks and selection distinct.
+type PlaylistHighlight struct {
+	VideoID    int64   `json:"video_id"`
+	VideoTitle string  `json:"video_title"`
+	Time       float64 `json:"time"`
+	Label      string  `json:"label"`
+	Number     int     `json:"number"`
 }
 
 type playerSession struct {
@@ -340,6 +351,9 @@ func (s *playerSession) playVideoLocked(path string, options PlayOptions) error 
 	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/highlight-playback", map[string]any{"enabled": false}}); err != nil {
 		return err
 	}
+	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-highlights", map[string]any{}}); err != nil {
+		return err
+	}
 	commands, err := buildBeforeLoadCommands(options)
 	if err != nil {
 		return err
@@ -432,17 +446,29 @@ func (s *playerSession) playPlaylistLocked(items []PlaylistItem, startIndex int)
 	callbacks := make(map[int64]func(), len(items))
 	reporters := make(map[int64]func() *playback.Reporter, len(items))
 	titles := make(map[string]string, len(items))
+	points := make(map[string]*PlaylistHighlight)
 	for index, entry := range entries {
 		callbacks[entry.ID] = items[index].OnStarted
 		reporters[entry.ID] = items[index].Options.NewWatchReporter
 		if title := strings.TrimSpace(items[index].Title); title != "" {
 			titles[strconv.FormatInt(entry.ID, 10)] = title
 		}
+		if items[index].Highlight != nil {
+			points[strconv.FormatInt(entry.ID, 10)] = items[index].Highlight
+		}
 	}
 	s.events.setCallbacks(callbacks)
 	s.events.setWatchReporters(reporters)
 	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-titles", titles}); err != nil {
 		return err
+	}
+	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-highlights", points}); err != nil {
+		return err
+	}
+	if mode.HighlightMode && len(points) > 0 {
+		if err := runIPCCommand(s.ipcPath, []any{"script-message-to", "playlist_sidebar", "show"}); err != nil {
+			return err
+		}
 	}
 	if err := runIPCCommand(s.ipcPath, []any{"playlist-play-index", startIndex}); err != nil {
 		return err

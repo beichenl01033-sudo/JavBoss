@@ -91,13 +91,62 @@ func TestHighlightAPIAndQueuePreserveTimeZeroAndSidecars(t *testing.T) {
 		t.Fatalf("filtered list: %+v", payload)
 	}
 	var played []mpv.PlaylistItem
-	playMPVPlaylistFrom = func(items []mpv.PlaylistItem, index int) error { played = items; return nil }
+	playedStart := -1
+	playMPVPlaylistFrom = func(items []mpv.PlaylistItem, index int) error { played, playedStart = items, index; return nil }
 	zero := 0.0
 	queue := videoPlaylistRequest{Player: "mpv", HighlightMode: true, LeadSeconds: 5, PreviewSeconds: 30, Items: []videoPlaylistItemRequest{{VideoID: video.ID, LocationID: location.ID, HighlightTime: &zero}}}
 	request("POST", "/videos/playlist", queue, 200)
-	if len(played) != 1 || !played[0].Options.HighlightMode || played[0].Options.StartTimeSec != 0 || played[0].Options.HighlightPreviewSeconds != 30 {
+	if len(played) != 2 || playedStart != 0 || !played[0].Options.HighlightMode || played[0].Options.StartTimeSec != 0 || played[0].Options.HighlightPreviewSeconds != 30 {
 		t.Fatalf("zero start lost: %+v", played)
 	}
+	if played[1].Path != played[0].Path || played[1].Options.StartTimeSec != 15 || played[1].Highlight.Time != 20 || played[1].Highlight.Number != 2 || played[1].Title != "movie.mp4 - twenty · 0:20" {
+		t.Fatalf("points not expanded distinctly: %+v", played)
+	}
+	twenty := 20.0
+	queue.Items[0].HighlightTime = &twenty
+	request("POST", "/videos/playlist", queue, 200)
+	if playedStart != 1 || len(played) != 2 {
+		t.Fatalf("selected point did not preserve preceding entries: start=%d items=%d", playedStart, len(played))
+	}
+	// The input start index selects a video, not its expanded point offset.
+	other := models.Video{Fingerprint: "highlight-api-other"}
+	if err := database.Create(&other).Error; err != nil {
+		t.Fatal(err)
+	}
+	otherLocation, err := dbpkg.Default().UpsertVideoLocation(context.Background(), other.ID, dir.ID, "other.mp4", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "other.mp4"), []byte("other video"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	otherPath := highlights.Path(root, other.ID)
+	if err := os.MkdirAll(filepath.Dir(otherPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(otherPath, []byte(`{"version":1,"items":[{"time":10,"label":""}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	queue.Items = append(queue.Items, videoPlaylistItemRequest{VideoID: other.ID, LocationID: otherLocation.ID})
+	queue.StartIndex = 1
+	result := request("POST", "/videos/playlist", queue, 200)
+	if len(played) != 3 || playedStart != 2 || played[2].Highlight.VideoID != other.ID || played[2].Highlight.Label != "亮点 1" {
+		t.Fatalf("video start expansion: start=%d items=%+v", playedStart, played)
+	}
+	var counts struct {
+		Count      int `json:"count"`
+		VideoCount int `json:"video_count"`
+	}
+	if err := json.Unmarshal(result.Body.Bytes(), &counts); err != nil || counts.Count != 3 || counts.VideoCount != 2 {
+		t.Fatalf("queue counts: %+v %v", counts, err)
+	}
+	queue.Items, queue.StartIndex = queue.Items[:1], 0
+	queue.HighlightMode = false
+	request("POST", "/videos/playlist", queue, 200)
+	if len(played) != 1 || played[0].Highlight != nil || played[0].Title != "movie.mp4" {
+		t.Fatal("ordinary playback was expanded")
+	}
+	queue.HighlightMode = true
 	badTime := 99.0
 	queue.Items[0].HighlightTime = &badTime
 	request("POST", "/videos/playlist", queue, http.StatusConflict)

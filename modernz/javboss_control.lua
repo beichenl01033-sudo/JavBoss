@@ -128,9 +128,46 @@ local function review_options()
     return mp.get_property_native("user-data/javboss/highlight-playback", {}) or {}
 end
 
+local function current_playlist_point()
+    if not review_options().enabled then return nil end
+    local position = mp.get_property_number("playlist-pos", -1) or -1
+    if position < 0 then return nil end
+    local id = mp.get_property_native("playlist/" .. position .. "/id")
+    if not id then return nil end
+    return mp.get_property_native("user-data/javboss/playlist-highlights/" .. tostring(id))
+end
+
+local function step_playlist_point(direction)
+    local position = mp.get_property_number("playlist-pos", 0) or 0
+    local count = mp.get_property_number("playlist-count", 1) or 1
+    local target = position + direction
+    if target >= 0 and target < count then
+        review_transition = true
+        mp.commandv("playlist-play-index", target)
+    else
+        osd(direction > 0 and "已到最后一个亮点" or "已到第一个亮点")
+    end
+end
+
 local function seek_highlight(index)
     local item = highlights[index]
     if not item then return end
+    local point = current_playlist_point()
+    if point then
+        local points = mp.get_property_native("user-data/javboss/playlist-highlights", {}) or {}
+        local current = mp.get_property_number("playlist-pos", -1) or -1
+        for row, entry in ipairs(mp.get_property_native("playlist", {}) or {}) do
+            local target = points[tostring(entry.id)]
+            if target and target.video_id == point.video_id and target.time == item.time then
+                if row - 1 ~= current then
+                    review_transition = true
+                    mp.commandv("playlist-play-index", row - 1)
+                    return
+                end
+                break
+            end
+        end
+    end
     review_index = index
     review_transition = true
     local lead = math.max(0, tonumber(review_options().lead_seconds) or 0)
@@ -139,6 +176,7 @@ local function seek_highlight(index)
 end
 
 local function step_highlight(direction)
+    if current_playlist_point() then step_playlist_point(direction) return end
     if #highlights == 0 then osd("当前视频没有亮点") return end
     local at = mp.get_property_number("time-pos", 0) or 0
     local lead = math.max(0, tonumber(review_options().lead_seconds) or 0)
@@ -528,13 +566,18 @@ mp.register_event("file-loaded", function()
     load_highlights()
     local review = review_options()
     if review.enabled and #highlights > 0 then
+        local point = current_playlist_point()
         local start = mp.get_property_number("time-pos", 0) or 0
         local lead = math.max(0, tonumber(review.lead_seconds) or 0)
         review_index = 1
         for i, item in ipairs(highlights) do
             if math.max(0, item.time - lead) <= start + 0.5 then review_index = i end
         end
-        if pending_last_highlight then seek_highlight(#highlights) end
+        if point then
+            review_index = tonumber(point.number) or 1
+        elseif pending_last_highlight then
+            seek_highlight(#highlights)
+        end
     end
     pending_last_highlight = false
 end)
@@ -544,10 +587,11 @@ mp.observe_property("time-pos", "number", function(_, at)
     local review = review_options()
     local seconds = tonumber(review.preview_seconds) or 0
     if not at or review_transition or not review.enabled or seconds <= 0 or mp.get_property_bool("pause", false) then return end
-    local item = highlights[review_index]
+    local point = current_playlist_point()
+    local item = point or highlights[review_index]
     local duration = mp.get_property_number("duration", math.huge) or math.huge
     if item and at >= math.min(item.time + seconds, duration - 0.2) then
-        if review_index < #highlights then
+        if not point and review_index < #highlights then
             seek_highlight(review_index + 1)
         elseif (mp.get_property_number("playlist-pos", 0) or 0) + 1 < (mp.get_property_number("playlist-count", 1) or 1) then
             review_transition = true

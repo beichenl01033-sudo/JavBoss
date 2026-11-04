@@ -61,7 +61,7 @@ export default function HighlightToolbar({ query, only, onOnlyChange }) {
         )
       )
         return
-      await playHighlights(videos, {
+      const result = await playHighlights(videos, {
         previewSeconds: preview ? seconds : 0,
         leadSeconds: lead,
         signal: request.signal,
@@ -69,8 +69,8 @@ export default function HighlightToolbar({ query, only, onOnlyChange }) {
       if (!request.signal.aborted) {
         setMessage(
           zh(
-            `已在 MPV 中打开 ${videos.length} 个视频的亮点`,
-            `Opened highlights from ${videos.length} videos in MPV`
+            `已在 MPV 中打开 ${videos.length} 个视频、${result.count} 条亮点`,
+            `Opened ${result.count} highlights from ${videos.length} videos in MPV`
           )
         )
         setSnapshot(null)
@@ -125,8 +125,8 @@ export default function HighlightToolbar({ query, only, onOnlyChange }) {
           </div>
           <p className="text-sm text-slate-500">
             {zh(
-              '包含所有分页。在 MPV 亮点侧栏中切换亮点和视频。',
-              'Includes every page. Use the MPV highlight sidebar to move between highlights and videos.'
+              '包含所有分页。MPV 播放列表每行对应“视频 - 亮点”，点击任意一行直接播放。',
+              'Includes every page. Each MPV playlist row is a video and highlight. Click any row to play it.'
             )}
           </p>
           <label className="flex items-center gap-2 text-sm">

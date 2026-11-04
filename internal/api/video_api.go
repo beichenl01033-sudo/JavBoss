@@ -532,7 +532,9 @@ var playMPVPlaylistFrom = mpv.PlayPlaylistFrom
 
 // playVideoPlaylist accepts ordered items (video_id, optional location_id) and
 // player: "mpv" (default) or "system" (local access, opens an M3U8 playlist).
-// highlight_mode=true starts each entry at its first mark (or highlight_time).
+// highlight_mode=true expands every video into one entry per saved mark.
+// start_index selects an input video; highlight_time selects its initial point,
+// while retaining all of that video's marks in the resulting playlist.
 // preview_seconds=0 selects manual playback; 0<preview_seconds<=600 auto-advances
 // marks. lead_seconds (0..60) adds context before each mark. Both require MPV.
 func playVideoPlaylist(c *gin.Context) {
@@ -565,6 +567,7 @@ func playVideoPlaylist(c *gin.Context) {
 		dataDir = filepath.Dir(cfg.DatabasePath)
 	}
 	items := make([]mpv.PlaylistItem, 0, len(req.Items))
+	playlistStartIndex := req.StartIndex
 	if req.HighlightMode && (req.Player == "system" || req.PreviewSeconds < 0 || req.PreviewSeconds > 600 || req.LeadSeconds < 0 || req.LeadSeconds > 60) {
 		respondLocalizedError(c, http.StatusBadRequest, "亮点播放参数无效（仅支持 MPV）", "Invalid highlight playback options (MPV only)")
 		return
@@ -573,7 +576,7 @@ func playVideoPlaylist(c *gin.Context) {
 		respondLocalizedError(c, http.StatusServiceUnavailable, "亮点数据目录未就绪", "Highlight data directory is unavailable")
 		return
 	}
-	for _, requested := range req.Items {
+	for videoIndex, requested := range req.Items {
 		if requested.VideoID <= 0 || requested.LocationID < 0 {
 			respondLocalizedError(c, http.StatusBadRequest, "播放列表包含无效视频", "Playlist contains an invalid video")
 			return
@@ -611,19 +614,25 @@ func playVideoPlaylist(c *gin.Context) {
 			return
 		}
 
-		startTime := 0.0
+		var points []highlights.Item
 		if req.HighlightMode {
 			doc, err := highlights.Read(highlights.Path(dataDir, requested.VideoID))
 			if err != nil || len(doc.Items) == 0 {
 				respondLocalizedError(c, http.StatusConflict, "部分视频亮点已改变，请刷新后重试", "Some highlights changed; refresh and retry")
 				return
 			}
-			startTime = doc.Items[0].Time
+			points = doc.Items
+			if videoIndex == req.StartIndex {
+				playlistStartIndex = len(items)
+			}
 			if requested.HighlightTime != nil {
 				found := false
-				for _, point := range doc.Items {
+				for pointIndex, point := range points {
 					if point.Time == *requested.HighlightTime {
-						startTime, found = point.Time, true
+						found = true
+						if videoIndex == req.StartIndex {
+							playlistStartIndex = len(items) + pointIndex
+						}
 						break
 					}
 				}
@@ -632,10 +641,9 @@ func playVideoPlaylist(c *gin.Context) {
 					return
 				}
 			}
-			startTime = max(0, startTime-req.LeadSeconds)
 		}
 		videoID := requested.VideoID
-		items = append(items, mpv.PlaylistItem{
+		baseItem := mpv.PlaylistItem{
 			Path:  fullPath,
 			Title: location.Filename,
 			OnStarted: func() {
@@ -649,12 +657,26 @@ func playVideoPlaylist(c *gin.Context) {
 				NewWatchReporter:        localPlaybackReporter(videoID, location.ID, "", ""),
 				DataDir:                 dataDir,
 				VideoID:                 requested.VideoID,
-				StartTimeSec:            startTime,
 				HighlightMode:           req.HighlightMode,
 				HighlightPreviewSeconds: req.PreviewSeconds,
 				HighlightLeadSeconds:    req.LeadSeconds,
 			},
-		})
+		}
+		if !req.HighlightMode {
+			items = append(items, baseItem)
+			continue
+		}
+		for pointIndex, point := range points {
+			item := baseItem
+			label := strings.TrimSpace(point.Label)
+			if label == "" {
+				label = fmt.Sprintf("亮点 %d", pointIndex+1)
+			}
+			item.Title = fmt.Sprintf("%s - %s · %s", location.Filename, label, formatHighlightTimestamp(point.Time))
+			item.Options.StartTimeSec = max(0, point.Time-req.LeadSeconds)
+			item.Highlight = &mpv.PlaylistHighlight{VideoID: videoID, VideoTitle: location.Filename, Time: point.Time, Label: label, Number: pointIndex + 1}
+			items = append(items, item)
+		}
 	}
 
 	if req.Player == "system" {
@@ -671,7 +693,7 @@ func playVideoPlaylist(c *gin.Context) {
 		return
 	}
 
-	if err := playMPVPlaylistFrom(items, req.StartIndex); err != nil {
+	if err := playMPVPlaylistFrom(items, playlistStartIndex); err != nil {
 		logging.Error("play video playlist error: %v", err)
 		if strings.Contains(err.Error(), "mpv not found") {
 			respondLocalizedError(c, http.StatusServiceUnavailable, "未找到 MPV 播放器", err.Error())
@@ -680,7 +702,15 @@ func playVideoPlaylist(c *gin.Context) {
 		respondLocalizedError(c, http.StatusInternalServerError, "播放列表启动失败", "Failed to start playlist")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "count": len(items)})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "count": len(items), "video_count": len(req.Items)})
+}
+
+func formatHighlightTimestamp(seconds float64) string {
+	total := int64(seconds)
+	if total >= 3600 {
+		return fmt.Sprintf("%d:%02d:%02d", total/3600, total%3600/60, total%60)
+	}
+	return fmt.Sprintf("%d:%02d", total/60, total%60)
 }
 
 func revealVideoLocation(c *gin.Context) {
