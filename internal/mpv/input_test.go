@@ -103,6 +103,11 @@ func TestBuildInputConfContentIncludesDefaultScreenshotKey(t *testing.T) {
 	if !strings.Contains(content, "SPACE cycle pause\n") {
 		t.Fatalf("expected SPACE cycle pause in mpv input config, got %q", content)
 	}
+	for _, binding := range []string{"MBTN_LEFT script-binding javboss_control/canvas-click\n", "MBTN_LEFT_DBL script-binding javboss_control/canvas-double-click\n"} {
+		if !strings.Contains(content, binding) {
+			t.Fatalf("missing canvas binding %q", binding)
+		}
+	}
 	if !strings.Contains(content, "ESC write-watch-later-config; stop; set window-minimized yes") {
 		t.Fatalf("expected ESC to write watch-later before stop in mpv input config, got %q", content)
 	}

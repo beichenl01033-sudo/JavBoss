@@ -4028,8 +4028,11 @@ local function visibility_mode(mode, no_osd)
         end
     end
 
+    -- Releasing a sidebar's temporary pin must not hide the bar under the
+    -- pointer. Keep it rendered and restart normal auto-hide from this click.
+    local keep_visible = mode == "auto" and user_opts.visibility == "always" and state.osc_visible
     if mode == "auto" then
-        always_on(false)
+        if keep_visible then hide_wc() else always_on(false) end
         enable_osc(true)
     elseif mode == "always" then
         enable_osc(true)
@@ -4042,6 +4045,7 @@ local function visibility_mode(mode, no_osd)
     end
 
     user_opts.visibility = mode
+    if keep_visible then reset_timeout() end
     mp.set_property_native("user-data/osc/visibility", mode)
 
     if not no_osd and tonumber(mp.get_property("osd-level")) >= 1 then
