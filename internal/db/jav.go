@@ -170,6 +170,7 @@ func (store *Store) SearchJav(ctx context.Context, idolIDs []int64, tagIDs []int
 
 // JavSearchFilters contains optional filters for a JAV list query.
 type JavSearchFilters struct {
+	HighlightOnly     bool
 	StudioID          int64
 	SeriesID          int64
 	SoloOnly          bool
@@ -1188,6 +1189,9 @@ func (store *Store) buildJavFilter(ctx context.Context, idolIDs []int64, tagIDs 
 		Where("vl.jav_id = jav.id").
 		Where(activeDirectoryWhereSQL("d"))
 	validLocation = applyDirectoryFilter(validLocation, "vl", directoryIDs)
+	if filters.HighlightOnly {
+		validLocation = validLocation.Where("vl.video_id IN (SELECT id FROM video WHERE highlight_count > 0)")
+	}
 	q = q.Where("EXISTS (?)", validLocation)
 	if search != "" {
 		like := fmt.Sprintf("%%%s%%", search)

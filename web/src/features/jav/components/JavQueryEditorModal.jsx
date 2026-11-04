@@ -102,6 +102,7 @@ export default function JavQueryEditorModal({
   directoryId = null,
 }) {
   const preferChinese = useStore((state) => preferChineseSeries(state.config))
+  const highlightOnly = useStore((state) => state.highlightOnly)
   const prefixInputRef = useRef(null)
   const idolInputRef = useRef(null)
   const tagInputRef = useRef(null)
@@ -211,6 +212,7 @@ export default function JavQueryEditorModal({
     setFilterOptionsError('')
     const timeout = window.setTimeout(() => {
       fetchJavFilterOptions({
+        highlightOnly,
         search: keyword.trim(),
         idolIds: selectedIdolIds,
         tagIds: selectedTagIds,
@@ -264,6 +266,7 @@ export default function JavQueryEditorModal({
     }
   }, [
     favoriteGroupId,
+    highlightOnly,
     idolOptions,
     idolSearch,
     keyword,

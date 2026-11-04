@@ -5,7 +5,7 @@ local opts = {
     enabled = true,
     width = 320,
     max_width_ratio = 0.58,
-    header_height = 58,
+    header_height = 100,
     footer_height = 34,
     control_bar_height = 96,
     row_height = 42,
@@ -148,16 +148,23 @@ local function render()
     append_rect(parts, pane_left, opts.header_height - 1, width, opts.header_height, "424650", "00")
     parts[#parts + 1] = string.format(
         "{\\an4\\pos(%d,%d)\\bord0\\shad0\\fs25\\b1\\fn%s\\1c&HFFFFFF&}%s",
-        pane_left + 18, math.floor(opts.header_height / 2), sidebar_font, ass_escape(opts.title)
+        pane_left + 18, 28, sidebar_font, ass_escape(opts.title)
     )
     parts[#parts + 1] = string.format(
         "{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs26\\b0\\fn%s\\1c&HF0A34A&}+",
-        width - 68, math.floor(opts.header_height / 2), sidebar_font
+        width - 68, 28, sidebar_font
     )
     parts[#parts + 1] = string.format(
         "{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs24\\b0\\fn%s\\1c&HCDD0D7&}×",
-        width - 22, math.floor(opts.header_height / 2), sidebar_font
+        width - 22, 28, sidebar_font
     )
+    local review = mp.get_property_native("user-data/javboss/highlight-playback", {}) or {}
+    local labels = { "上一亮点", "下一亮点", (tonumber(review.preview_seconds) or 0) > 0 and "停止预览" or "自动预览" }
+    for index, label in ipairs(labels) do
+        parts[#parts + 1] = string.format(
+            "{\\an5\\pos(%d,76)\\bord0\\shad0\\fs14\\fn%s\\1c&HCDD0D7&}%s",
+            pane_left + math.floor(pane_width * (index - 0.5) / 3), sidebar_font, label)
+    end
 
     if #items == 0 then
         parts[#parts + 1] = string.format(
@@ -240,7 +247,11 @@ local function end_click()
     local mouse_x, mouse_y = get_mouse_position()
     if not mouse_x or not mouse_y then return end
     if mouse_y < opts.header_height then
-        if mouse_x >= window_width - 46 then
+        if mouse_y >= 54 then
+            local slot = math.min(3, math.floor((mouse_x - pane_left) / ((window_width - pane_left) / 3)) + 1)
+            local actions = { "previous-highlight", "next-highlight", "toggle-highlight-preview" }
+            mp.commandv("script-message-to", "javboss_control", actions[slot])
+        elseif mouse_x >= window_width - 46 then
             sidebar_collapsed = true
             hide_sidebar()
         elseif mouse_x >= window_width - 92 then
@@ -255,7 +266,7 @@ local function end_click()
         return
     end
     local item = highlights()[index]
-    if item then mp.commandv("seek", tostring(item.time), "absolute+exact") end
+    if item then mp.commandv("script-message-to", "javboss_control", "seek-highlight", tostring(index)) end
 end
 
 local function rename_clicked_row()
@@ -300,6 +311,7 @@ for _, property in ipairs({
     "osd-dimensions",
     "display-hidpi-scale",
     "user-data/javboss/highlights",
+    "user-data/javboss/highlight-playback",
 }) do
     mp.observe_property(property, "native", request_render)
 end

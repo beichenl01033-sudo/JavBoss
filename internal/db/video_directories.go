@@ -14,11 +14,15 @@ import (
 
 // VideoFilter narrows the active locations returned by ListVideos and CountVideos.
 type VideoFilter struct {
-	HideJav      bool
-	Subdirectory string
+	HideJav       bool
+	Subdirectory  string
+	HighlightOnly bool
 }
 
 func applyVideoSubdirectoryFilter(query *gorm.DB, filters []VideoFilter) *gorm.DB {
+	if len(filters) > 0 && filters[0].HighlightOnly {
+		query = query.Where("video_location.video_id IN (SELECT id FROM video WHERE highlight_count > 0)")
+	}
 	if len(filters) == 0 || filters[0].Subdirectory == "" || filters[0].Subdirectory == "." {
 		return query
 	}

@@ -26,6 +26,7 @@ import (
 )
 
 type javFilterQuery struct {
+	HighlightOnly     bool
 	IdolIDs           []int64
 	TagIDs            []int64
 	Search            string
@@ -40,12 +41,13 @@ type javFilterQuery struct {
 
 func parseJavFilterQuery(c *gin.Context) (javFilterQuery, bool) {
 	query := javFilterQuery{
-		IdolIDs:  parseInt64CSV(c.Query("idol_ids")),
-		TagIDs:   parseInt64CSV(c.Query("tag_ids")),
-		Search:   strings.TrimSpace(c.Query("search")),
-		Prefix:   strings.TrimSpace(c.Query("prefix")),
-		StudioID: -1,
-		SoloOnly: queryBool(c, "solo", false),
+		HighlightOnly: queryBool(c, "highlight_only", false),
+		IdolIDs:       parseInt64CSV(c.Query("idol_ids")),
+		TagIDs:        parseInt64CSV(c.Query("tag_ids")),
+		Search:        strings.TrimSpace(c.Query("search")),
+		Prefix:        strings.TrimSpace(c.Query("prefix")),
+		StudioID:      -1,
+		SoloOnly:      queryBool(c, "solo", false),
 	}
 	if studioParam := strings.TrimSpace(c.Query("studio_id")); studioParam != "" {
 		parsed, err := strconv.ParseInt(studioParam, 10, 64)
@@ -92,7 +94,11 @@ func parseJavFilterQuery(c *gin.Context) (javFilterQuery, bool) {
 
 // searchJav accepts sort=watched (longest first) or watched_asc (shortest first)
 // for cumulative watch time; legacy play_count sort values are aliases.
+// highlight_only=1 selects works with a marked video in the visible directory scope.
 func searchJav(c *gin.Context) {
+	if !syncHighlightIndex(c, false) {
+		return
+	}
 	limit := queryInt(c, "limit", 100)
 	offset := queryInt(c, "offset", 0)
 	filterQuery, ok := parseJavFilterQuery(c)
@@ -116,6 +122,7 @@ func searchJav(c *gin.Context) {
 	}
 
 	items, total, err := dbpkg.Default().SearchJavWithPrefixFilters(c.Request.Context(), filterQuery.IdolIDs, filterQuery.TagIDs, filterQuery.Search, filterQuery.Prefix, sort, limit, offset, seed, directoryIDs, dbpkg.JavSearchFilters{
+		HighlightOnly:     filterQuery.HighlightOnly,
 		StudioID:          filterQuery.StudioID,
 		SeriesID:          filterQuery.SeriesID,
 		SoloOnly:          filterQuery.SoloOnly,
@@ -135,6 +142,9 @@ func searchJav(c *gin.Context) {
 }
 
 func listJavFilterOptions(c *gin.Context) {
+	if !syncHighlightIndex(c, false) {
+		return
+	}
 	filterQuery, ok := parseJavFilterQuery(c)
 	if !ok {
 		return
@@ -151,6 +161,7 @@ func listJavFilterOptions(c *gin.Context) {
 		filterQuery.Prefix,
 		directoryIDs,
 		dbpkg.JavSearchFilters{
+			HighlightOnly:     filterQuery.HighlightOnly,
 			StudioID:          filterQuery.StudioID,
 			SeriesID:          filterQuery.SeriesID,
 			SoloOnly:          filterQuery.SoloOnly,

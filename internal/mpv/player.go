@@ -30,11 +30,14 @@ const (
 )
 
 type PlayOptions struct {
-	NewWatchReporter       func() *playback.Reporter
-	DataDir                string
-	VideoID                int64
-	StartTimeSec           float64
-	EnableNetworkThumbnail bool
+	NewWatchReporter        func() *playback.Reporter
+	DataDir                 string
+	VideoID                 int64
+	StartTimeSec            float64
+	EnableNetworkThumbnail  bool
+	HighlightMode           bool
+	HighlightPreviewSeconds float64
+	HighlightLeadSeconds    float64
 }
 
 // PlaylistItem describes one file in an MPV playlist.
@@ -334,6 +337,9 @@ func (s *playerSession) stopLocked() {
 }
 
 func (s *playerSession) playVideoLocked(path string, options PlayOptions) error {
+	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/highlight-playback", map[string]any{"enabled": false}}); err != nil {
+		return err
+	}
 	commands, err := buildBeforeLoadCommands(options)
 	if err != nil {
 		return err
@@ -393,6 +399,12 @@ func (s *playerSession) playPlaylistLocked(items []PlaylistItem, startIndex int)
 		return err
 	}
 	if err := runIPCCommand(s.ipcPath, []any{"playlist-clear"}); err != nil {
+		return err
+	}
+	mode := items[startIndex].Options
+	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/highlight-playback", map[string]any{
+		"enabled": mode.HighlightMode, "preview_seconds": mode.HighlightPreviewSeconds, "lead_seconds": mode.HighlightLeadSeconds,
+	}}); err != nil {
 		return err
 	}
 	for _, item := range items {
@@ -644,7 +656,10 @@ func buildPlaylistLoadFileCommand(item PlaylistItem, mode string) ([]any, error)
 	if screenshotDir != "" {
 		options["screenshot-directory"] = screenshotDir
 	}
-	if item.Options.StartTimeSec > 0 {
+	if item.Options.HighlightMode {
+		options["resume-playback"] = "no"
+	}
+	if item.Options.StartTimeSec > 0 || item.Options.HighlightMode {
 		options["start"] = strconv.FormatFloat(item.Options.StartTimeSec, 'f', -1, 64)
 	}
 	return []any{"loadfile", item.Path, mode, -1, options}, nil

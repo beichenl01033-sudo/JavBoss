@@ -27,6 +27,7 @@ import { MovieEdit } from '@mui/icons-material'
 import VideoLibraryOutlinedIcon from '@mui/icons-material/VideoLibraryOutlined'
 import { JavItemEditors } from '@/features/jav/components/JavItemEditors'
 import WatchTimeIcons from '@/features/playback/components/WatchTimeIcons'
+import HighlightBadge from '@/features/highlights/components/HighlightBadge'
 
 export default function JavCard(props) {
   const { portrait = false } = props
@@ -168,6 +169,7 @@ export default function JavCard(props) {
           className="card-hover-scope group relative shrink-0 overflow-hidden bg-white"
           style={{ aspectRatio: portrait ? `100 / ${coverAspectPercent}` : '800 / 538' }}
         >
+          <HighlightBadge videos={item?.videos || []} className="absolute bottom-12 left-2 z-10" />
           {cover ? (
             <JavCoverImage
               src={cover}

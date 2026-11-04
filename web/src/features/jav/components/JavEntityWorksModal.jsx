@@ -7,6 +7,7 @@ import { fetchJavs } from '@/features/jav/api'
 import JavGrid from '@/features/jav/components/JavGrid'
 import Pagination from '@/shared/ui/Pagination'
 import AppModal from '@/shared/ui/AppModal'
+import HighlightToolbar from '@/features/highlights/components/HighlightToolbar'
 import { useStore } from '@/store'
 import { getErrorMessage } from '@/utils/errors'
 import { zh } from '@/utils/i18n'
@@ -56,6 +57,14 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const globalHighlightOnly = useStore((state) => state.highlightOnly)
+  const [highlightOnly, setHighlightOnly] = useState(globalHighlightOnly)
+  const [highlightRevision, setHighlightRevision] = useState(0)
+  useEffect(() => {
+    const refresh = () => setHighlightRevision((current) => current + 1)
+    window.addEventListener('javboss-highlights-changed', refresh)
+    return () => window.removeEventListener('javboss-highlights-changed', refresh)
+  }, [])
   const scrollRef = useRef(null)
   const filters = useMemo(() => javEntityFilters(entity), [entity])
   const sort = useMemo(
@@ -80,6 +89,7 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
       limit: pageSize,
       offset: (page - 1) * pageSize,
       sort,
+      highlightOnly,
       directoryId: selectedDirectoryId,
       signal: controller.signal,
       ...filters,
@@ -95,7 +105,7 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [filters, page, pageSize, selectedDirectoryId, sort])
+  }, [filters, page, pageSize, selectedDirectoryId, sort, highlightOnly, highlightRevision])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 })
@@ -131,6 +141,16 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <HighlightToolbar
+            query={{ ...filters, sort, directoryId: selectedDirectoryId }}
+            only={highlightOnly}
+            onOnlyChange={(value) => {
+              setHighlightOnly(value)
+              setPage(1)
+            }}
+          />
+        </div>
         <div className="mb-4 flex justify-center">
           <Pagination
             page={page}

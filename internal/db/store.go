@@ -8,7 +8,8 @@ import (
 
 // Store binds all persistence operations to one database. The caller owns its lifetime.
 type Store struct {
-	conn *gorm.DB
+	conn           *gorm.DB
+	highlightIndex highlightIndex
 }
 
 func NewStore(conn *gorm.DB) *Store {
