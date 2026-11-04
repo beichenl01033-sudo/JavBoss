@@ -11,6 +11,7 @@ export const directoryScopeKey = (state) =>
 
 export function videoQuery(state) {
   return {
+    highlightOnly: Boolean(state.highlightOnly),
     limit: state.pageSize,
     offset: state.randomMode ? 0 : (state.page - 1) * state.pageSize,
     tags: state.selectedTags || [],
@@ -25,6 +26,7 @@ export function videoQuery(state) {
 
 export function javQuery(state) {
   return {
+    highlightOnly: Boolean(state.highlightOnly),
     limit: state.javPageSize,
     offset: state.javRandomMode ? 0 : (state.javPage - 1) * state.javPageSize,
     search: state.javSearchTerm || '',

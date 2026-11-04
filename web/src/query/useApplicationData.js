@@ -2,9 +2,11 @@ import { useStore } from '@/store'
 import { useShallow } from 'zustand/react/shallow'
 import { useState, useMemo, useEffect } from 'react'
 import useWatchedTimeSync from '@/query/useWatchedTimeSync'
+import useHighlightSync from '@/features/highlights/hooks/useHighlightSync'
 
 export default function useApplicationData() {
   useWatchedTimeSync()
+  useHighlightSync()
   const {
     directories,
     selectedDirectoryId,

@@ -1,5 +1,6 @@
 import Tooltip from '@/shared/ui/Tooltip'
 import VideoDirectoryFilter from '@/features/video/components/VideoDirectoryFilter'
+import HighlightToolbar from '@/features/highlights/components/HighlightToolbar'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryAddCheckOutlinedIcon from '@mui/icons-material/LibraryAddCheckOutlined'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
@@ -506,7 +507,7 @@ export default function TopBar({
         >
           JavBoss
         </button>
-        <div className="filter-topbar__controls">
+        <div className="filter-topbar__controls flex-wrap">
           {!isJavMode ? (
             <div className="relative -ml-1 mr-4 shrink-0 border-r border-slate-200 pr-4">
               <VideoDirectoryFilter />
@@ -602,6 +603,8 @@ export default function TopBar({
               useHostPaths={useHostPaths}
             />
           ) : null}
+
+          {(!isJavMode || javTab === 'list') && <HighlightToolbar />}
 
           {isJavMode && javTab === 'list' ? (
             <FavoriteRatingFilter

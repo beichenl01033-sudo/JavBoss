@@ -22,6 +22,7 @@ import PhotoLibraryOutlinedIcon from '@mui/icons-material/PhotoLibraryOutlined'
 import { MovieEdit } from '@mui/icons-material'
 import WatchTimeIcons from '@/features/playback/components/WatchTimeIcons'
 import VideoThumbnail from '@/features/video/components/VideoThumbnail'
+import HighlightBadge from '@/features/highlights/components/HighlightBadge'
 
 const coverButtonClassName =
   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/70 text-white shadow-lg shadow-black/60 hover:bg-black/85 disabled:cursor-not-allowed disabled:opacity-40'
@@ -183,6 +184,7 @@ export default function VideoCard({
           className="h-full w-full object-cover"
           loading="lazy"
         />
+        <HighlightBadge videos={[video]} className="absolute bottom-12 left-2 z-10" />
         {javCode ? (
           <div
             className="absolute right-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate rounded bg-black/70 px-2 py-1 text-xs text-white"

@@ -30,6 +30,7 @@ export default function useLibraryFilters({
     setSearchTerm,
     setSelectedTags,
     searchTerm,
+    highlightOnly,
     javSearchTerm,
     javTagOptions,
     config,
@@ -57,6 +58,7 @@ export default function useLibraryFilters({
       setSearchTerm: state.setSearchTerm,
       setSelectedTags: state.setSelectedTags,
       searchTerm: state.searchTerm,
+      highlightOnly: state.highlightOnly,
       javSearchTerm: state.javSearchTerm,
       javTagOptions: state.javTagOptions,
       config: state.config,
@@ -303,6 +305,12 @@ export default function useLibraryFilters({
   const activeFilterItems = useMemo(() => {
     if (!isJavMode) {
       const items = []
+      if (highlightOnly)
+        items.push({
+          key: 'highlights',
+          label: zh('仅看有亮点', 'With highlights'),
+          onRemove: () => updateVideoFilters({ highlightOnly: false }),
+        })
       const activeSearch = String(searchTerm || '').trim()
       if (activeSearch) {
         items.push({
@@ -355,6 +363,12 @@ export default function useLibraryFilters({
       })
     }
     if (javTab !== 'list') return items
+    if (highlightOnly)
+      items.push({
+        key: 'highlights',
+        label: zh('仅看有亮点', 'With highlights'),
+        onRemove: () => updateJavFilters({ highlightOnly: false }),
+      })
 
     javIdolIds.forEach((id) => {
       const idol = javIdolOptionMap.get(Number(id))
@@ -438,6 +452,7 @@ export default function useLibraryFilters({
     return items
   }, [
     config,
+    highlightOnly,
     seriesItems,
     javItems,
     isJavMode,
@@ -470,6 +485,7 @@ export default function useLibraryFilters({
     if (!isJavMode) {
       setSearchInput('')
       updateVideoFilters({
+        highlightOnly: false,
         selectedTags: [],
         searchTerm: '',
         randomMode: false,
@@ -481,6 +497,7 @@ export default function useLibraryFilters({
     const updates = { javSearchTerm: '' }
     if (javTab === 'list') {
       Object.assign(updates, {
+        highlightOnly: false,
         javIdolIds: [],
         javTags: [],
         javStudioId: null,

@@ -137,11 +137,13 @@ export const parseUrlState = (searchString = window.location.search, options = {
     seed: clampSeed(sp.get('seed')),
   }
 
-  return { view, directoryId, video, jav }
+  const highlightOnly = sp.get('highlight_only') === '1'
+  return { view, directoryId, video, jav, highlightOnly }
 }
 
 export const buildUrlFromState = (state, basePath = window.location.pathname) => {
   const sp = new URLSearchParams()
+  if (state.highlightOnly) sp.set('highlight_only', '1')
   if (state.directoryId) sp.set('directory_id', String(state.directoryId))
   if (state.view === 'jav') {
     sp.set('view', 'jav')
@@ -246,6 +248,7 @@ export const normalizeUrlStateFromStore = (store, tagsByName) => {
 
   return {
     view: store.viewMode === 'jav' ? 'jav' : 'video',
+    highlightOnly: Boolean(store.highlightOnly),
     directoryId: store.selectedDirectoryId || null,
     video: {
       page: store.randomMode ? 1 : store.page,

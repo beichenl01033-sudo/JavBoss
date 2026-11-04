@@ -23,6 +23,7 @@ import (
 	"javboss/internal/models"
 	"javboss/internal/mpv"
 	"javboss/internal/util"
+	"javboss/internal/video/highlights"
 	"javboss/internal/video/screenshot"
 	"javboss/internal/video/stream"
 )
@@ -31,7 +32,11 @@ import (
 // for cumulative watch time; legacy play_count sort values are aliases.
 // directory_id selects an enabled library root. subdirectory is a relative directory
 // within that root; it includes all descendants and requires directory_id.
+// highlight_only=1 requires at least one saved highlight before pagination/counting.
 func listVideos(c *gin.Context) {
+	if !syncHighlightIndex(c, false) {
+		return
+	}
 	directoryIDs, subdirectory, valid := parseVideoDirectoryFilter(c)
 	if !valid {
 		return
@@ -57,14 +62,15 @@ func listVideos(c *gin.Context) {
 		seed = &parsed
 	}
 
-	videos, err := dbpkg.Default().ListVideos(c.Request.Context(), limit, offset, tagFilter, search, sort, seed, directoryIDs, dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory})
+	filter := dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory, HighlightOnly: queryBool(c, "highlight_only", false)}
+	videos, err := dbpkg.Default().ListVideos(c.Request.Context(), limit, offset, tagFilter, search, sort, seed, directoryIDs, filter)
 	if err != nil {
 		logging.Error("list videos error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载视频列表失败", "Failed to load videos")
 		return
 	}
 
-	total, err := dbpkg.Default().CountVideos(c.Request.Context(), tagFilter, search, directoryIDs, dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory})
+	total, err := dbpkg.Default().CountVideos(c.Request.Context(), tagFilter, search, directoryIDs, filter)
 	if err != nil {
 		logging.Error("count videos error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "统计视频数量失败", "Failed to count videos")
@@ -526,6 +532,9 @@ var playMPVPlaylistFrom = mpv.PlayPlaylistFrom
 
 // playVideoPlaylist accepts ordered items (video_id, optional location_id) and
 // player: "mpv" (default) or "system" (local access, opens an M3U8 playlist).
+// highlight_mode=true starts each entry at its first mark (or highlight_time).
+// preview_seconds=0 selects manual playback; 0<preview_seconds<=600 auto-advances
+// marks. lead_seconds (0..60) adds context before each mark. Both require MPV.
 func playVideoPlaylist(c *gin.Context) {
 	if common.ContainerMode() {
 		respondLocalizedError(c, http.StatusNotImplemented, "当前部署模式已禁用外部播放器", "External playback is disabled")
@@ -556,6 +565,14 @@ func playVideoPlaylist(c *gin.Context) {
 		dataDir = filepath.Dir(cfg.DatabasePath)
 	}
 	items := make([]mpv.PlaylistItem, 0, len(req.Items))
+	if req.HighlightMode && (req.Player == "system" || req.PreviewSeconds < 0 || req.PreviewSeconds > 600 || req.LeadSeconds < 0 || req.LeadSeconds > 60) {
+		respondLocalizedError(c, http.StatusBadRequest, "亮点播放参数无效（仅支持 MPV）", "Invalid highlight playback options (MPV only)")
+		return
+	}
+	if req.HighlightMode && dataDir == "" {
+		respondLocalizedError(c, http.StatusServiceUnavailable, "亮点数据目录未就绪", "Highlight data directory is unavailable")
+		return
+	}
 	for _, requested := range req.Items {
 		if requested.VideoID <= 0 || requested.LocationID < 0 {
 			respondLocalizedError(c, http.StatusBadRequest, "播放列表包含无效视频", "Playlist contains an invalid video")
@@ -594,6 +611,29 @@ func playVideoPlaylist(c *gin.Context) {
 			return
 		}
 
+		startTime := 0.0
+		if req.HighlightMode {
+			doc, err := highlights.Read(highlights.Path(dataDir, requested.VideoID))
+			if err != nil || len(doc.Items) == 0 {
+				respondLocalizedError(c, http.StatusConflict, "部分视频亮点已改变，请刷新后重试", "Some highlights changed; refresh and retry")
+				return
+			}
+			startTime = doc.Items[0].Time
+			if requested.HighlightTime != nil {
+				found := false
+				for _, point := range doc.Items {
+					if point.Time == *requested.HighlightTime {
+						startTime, found = point.Time, true
+						break
+					}
+				}
+				if !found {
+					respondLocalizedError(c, http.StatusConflict, "亮点已改变，请刷新后重试", "Highlight changed; refresh and retry")
+					return
+				}
+			}
+			startTime = max(0, startTime-req.LeadSeconds)
+		}
 		videoID := requested.VideoID
 		items = append(items, mpv.PlaylistItem{
 			Path:  fullPath,
@@ -606,9 +646,13 @@ func playVideoPlaylist(c *gin.Context) {
 				}
 			},
 			Options: mpv.PlayOptions{
-				NewWatchReporter: localPlaybackReporter(videoID, location.ID, "", ""),
-				DataDir:          dataDir,
-				VideoID:          requested.VideoID,
+				NewWatchReporter:        localPlaybackReporter(videoID, location.ID, "", ""),
+				DataDir:                 dataDir,
+				VideoID:                 requested.VideoID,
+				StartTimeSec:            startTime,
+				HighlightMode:           req.HighlightMode,
+				HighlightPreviewSeconds: req.PreviewSeconds,
+				HighlightLeadSeconds:    req.LeadSeconds,
 			},
 		})
 	}
@@ -1300,14 +1344,18 @@ type videoPathRequest struct {
 }
 
 type videoPlaylistItemRequest struct {
-	VideoID    int64 `json:"video_id"`
-	LocationID int64 `json:"location_id"`
+	VideoID       int64    `json:"video_id"`
+	LocationID    int64    `json:"location_id"`
+	HighlightTime *float64 `json:"highlight_time,omitempty"`
 }
 
 type videoPlaylistRequest struct {
-	Player     string                     `json:"player"`
-	Items      []videoPlaylistItemRequest `json:"items"`
-	StartIndex int                        `json:"start_index"`
+	Player         string                     `json:"player"`
+	Items          []videoPlaylistItemRequest `json:"items"`
+	StartIndex     int                        `json:"start_index"`
+	HighlightMode  bool                       `json:"highlight_mode"`
+	PreviewSeconds float64                    `json:"preview_seconds"`
+	LeadSeconds    float64                    `json:"lead_seconds"`
 }
 
 func resolveVideoPathFromBody(c *gin.Context) (string, string, error) {

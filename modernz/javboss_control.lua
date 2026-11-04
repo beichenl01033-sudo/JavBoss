@@ -12,6 +12,10 @@ options.read_options(opts, "javboss_control")
 local highlights = {}
 local native_chapters = {}
 local highlight_path = nil
+local highlight_raw = nil
+local review_index = 1
+local review_transition = false
+local pending_last_highlight = false
 local clip_a = nil
 local clip_b = nil
 local clip_request_sequence = 0
@@ -78,9 +82,11 @@ local function save_highlights()
         mp.msg.error("open highlight file: " .. tostring(err))
         return false
     end
-    file:write(utils.format_json({ version = 1, items = highlights }))
+    local raw = utils.format_json({ version = 1, items = highlights })
+    file:write(raw)
     file:write("\n")
     file:close()
+    highlight_raw = raw .. "\n"
     return true
 end
 
@@ -98,7 +104,8 @@ local function load_highlights()
     if highlight_path then
         local file = io.open(highlight_path, "rb")
         if file then
-            local parsed = utils.parse_json(file:read("*a") or "")
+            highlight_raw = file:read("*a") or ""
+            local parsed = utils.parse_json(highlight_raw)
             file:close()
             local items = type(parsed) == "table" and parsed.items or nil
             if type(items) == "table" then
@@ -115,6 +122,53 @@ local function load_highlights()
         end
     end
     publish_highlights()
+end
+
+local function review_options()
+    return mp.get_property_native("user-data/javboss/highlight-playback", {}) or {}
+end
+
+local function seek_highlight(index)
+    local item = highlights[index]
+    if not item then return end
+    review_index = index
+    review_transition = true
+    local lead = math.max(0, tonumber(review_options().lead_seconds) or 0)
+    mp.commandv("seek", math.max(0, item.time - lead), "absolute+exact")
+    osd(string.format("亮点 %d/%d · %s", index, #highlights, item.label or ""))
+end
+
+local function step_highlight(direction)
+    if #highlights == 0 then osd("当前视频没有亮点") return end
+    local at = mp.get_property_number("time-pos", 0) or 0
+    local lead = math.max(0, tonumber(review_options().lead_seconds) or 0)
+    local target = nil
+    if direction > 0 then
+        for i, item in ipairs(highlights) do
+            if item.time - lead > at + 0.25 then target = i break end
+        end
+    else
+        for i = #highlights, 1, -1 do
+            if math.max(0, highlights[i].time - lead) < at - 1 then target = i break end
+        end
+    end
+    if target then seek_highlight(target) return end
+    local position = mp.get_property_number("playlist-pos", 0) or 0
+    local count = mp.get_property_number("playlist-count", 1) or 1
+    if (direction > 0 and position + 1 < count) or (direction < 0 and position > 0) then
+        pending_last_highlight = direction < 0
+        mp.commandv(direction > 0 and "playlist-next" or "playlist-prev", "force")
+    else
+        osd(direction > 0 and "已到最后一个亮点" or "已到第一个亮点")
+    end
+end
+
+local function toggle_preview()
+    local review = review_options()
+    review.enabled = true
+    review.preview_seconds = (tonumber(review.preview_seconds) or 0) > 0 and 0 or 30
+    mp.set_property_native("user-data/javboss/highlight-playback", review)
+    osd(review.preview_seconds > 0 and "亮点自动预览：每个亮点 30 秒" or "已关闭亮点自动预览，继续播放当前视频")
 end
 
 local function current_time()
@@ -135,6 +189,7 @@ local function nearest_highlight(time)
 end
 
 local function add_highlight()
+    load_highlights()
     local time = current_time()
     if not time or not highlight_path then
         osd("当前视频无法保存亮点")
@@ -158,6 +213,11 @@ end
 local function delete_highlight(index)
     local item = highlights[index]
     if not item then return end
+    local target_time = item.time
+    load_highlights()
+    index = nil
+    for i, current in ipairs(highlights) do if current.time == target_time then index = i break end end
+    if not index then osd("亮点已改变，请重试") return end
     table.remove(highlights, index)
     if save_highlights() then
         publish_highlights()
@@ -174,7 +234,12 @@ local function rename_highlight(index)
         submit = function(value)
             value = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
             if value == "" then return end
-            item.label = value
+            local target_time = item.time
+            load_highlights()
+            local target = nil
+            for _, current in ipairs(highlights) do if current.time == target_time then target = current break end end
+            if not target then osd("亮点已改变，请重试") return end
+            target.label = value
             if save_highlights() then publish_highlights() end
         end,
     })
@@ -390,6 +455,11 @@ local function more_menu()
         mp.set_property_bool("ontop", not mp.get_property_native("ontop", false))
     end)
     add("媒体信息", function() mp.commandv("script-binding", "stats/display-page-1-toggle") end)
+    if #highlights > 0 then
+        add("上一个亮点", function() step_highlight(-1) end)
+        add("下一个亮点", function() step_highlight(1) end)
+        add((tonumber(review_options().preview_seconds) or 0) > 0 and "关闭亮点自动预览" or "开启亮点自动预览（30 秒）", toggle_preview)
+    end
 
     input.select({
         prompt = "更多",
@@ -426,6 +496,10 @@ local function clip_click()
 end
 
 mp.register_script_message("add-highlight", add_highlight)
+mp.register_script_message("seek-highlight", function(index) seek_highlight(tonumber(index)) end)
+mp.register_script_message("previous-highlight", function() step_highlight(-1) end)
+mp.register_script_message("next-highlight", function() step_highlight(1) end)
+mp.register_script_message("toggle-highlight-preview", toggle_preview)
 mp.register_script_message("manage-highlights", manage_highlights)
 mp.register_script_message("rename-highlight", function(index) rename_highlight(tonumber(index)) end)
 mp.register_script_message("confirm-delete-highlight", confirm_delete_highlight)
@@ -452,12 +526,56 @@ mp.register_event("file-loaded", function()
     end
     clear_clip(false)
     load_highlights()
+    local review = review_options()
+    if review.enabled and #highlights > 0 then
+        local start = mp.get_property_number("time-pos", 0) or 0
+        local lead = math.max(0, tonumber(review.lead_seconds) or 0)
+        review_index = 1
+        for i, item in ipairs(highlights) do
+            if math.max(0, item.time - lead) <= start + 0.5 then review_index = i end
+        end
+        if pending_last_highlight then seek_highlight(#highlights) end
+    end
+    pending_last_highlight = false
+end)
+
+-- Observe media time: pausing and NAS buffering do not consume preview duration.
+mp.observe_property("time-pos", "number", function(_, at)
+    local review = review_options()
+    local seconds = tonumber(review.preview_seconds) or 0
+    if not at or review_transition or not review.enabled or seconds <= 0 or mp.get_property_bool("pause", false) then return end
+    local item = highlights[review_index]
+    local duration = mp.get_property_number("duration", math.huge) or math.huge
+    if item and at >= math.min(item.time + seconds, duration - 0.2) then
+        if review_index < #highlights then
+            seek_highlight(review_index + 1)
+        elseif (mp.get_property_number("playlist-pos", 0) or 0) + 1 < (mp.get_property_number("playlist-count", 1) or 1) then
+            review_transition = true
+            mp.commandv("playlist-next", "force")
+        else
+            mp.set_property_bool("pause", true)
+            osd("亮点预览已结束")
+        end
+    end
+end)
+
+mp.register_event("playback-restart", function() review_transition = false end)
+
+-- Web edits are reflected in an already-open MPV without reopening the video.
+mp.add_periodic_timer(2, function()
+    if not highlight_path then return end
+    local file = io.open(highlight_path, "rb")
+    if not file then return end
+    local raw = file:read("*a") or ""
+    file:close()
+    if raw ~= highlight_raw and utils.parse_json(raw) then load_highlights() end
 end)
 
 mp.register_event("end-file", function()
     highlights = {}
     native_chapters = {}
     highlight_path = nil
+    highlight_raw = nil
     clear_clip(false)
     mp.set_property_number("user-data/javboss/highlight-count", 0)
     mp.set_property_native("user-data/javboss/highlights", {})

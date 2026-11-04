@@ -12,6 +12,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
     tags,
     config,
     viewMode,
+    highlightOnly,
     page,
     searchTerm,
     selectedDirectoryId,
@@ -53,6 +54,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       tags: state.tags,
       config: state.config,
       viewMode: state.viewMode,
+      highlightOnly: state.highlightOnly,
       page: state.page,
       searchTerm: state.searchTerm,
       selectedDirectoryId: state.selectedDirectoryId,
@@ -138,6 +140,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
           Number(current.idolFavoriteGroupId || 0) === Number(jav.favoriteGroupId || 0)
         useStore.setState({
           viewMode: 'jav',
+          highlightOnly: Boolean(parsed.highlightOnly),
           selectedDirectoryId: parsedDirectoryId,
           videoTempSort: '',
           javTab: jav.tab,
@@ -187,6 +190,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       const { video } = parsed
       useStore.setState({
         viewMode: 'video',
+        highlightOnly: Boolean(parsed.highlightOnly),
         javTempSort: '',
         idolTempSort: '',
         videoTempSort: video.random ? '' : video.tempSort,
@@ -219,6 +223,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       normalizeUrlStateFromStore(
         {
           viewMode,
+          highlightOnly,
           page,
           searchTerm,
           selectedDirectoryId,
@@ -293,6 +298,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       videoTempSort,
       tagsByName,
       viewMode,
+      highlightOnly,
       javStudioName,
       javSeriesName,
     ]

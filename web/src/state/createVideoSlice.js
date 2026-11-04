@@ -46,6 +46,8 @@ export function createVideoSlice({ set, get, lists }) {
     selectedVideoIds: new Set(),
     selectedVideoMeta: {},
     searchTerm: '',
+    highlightOnly: false,
+    setHighlightOnly: (value) => set({ highlightOnly: Boolean(value), page: 1, javPage: 1 }),
     selectedDirectoryId: null,
     videoDirectoryId: null,
     videoSubdirectory: '',

@@ -126,6 +126,7 @@ export default function useUrlStateSync({
           : currentUrlState.directoryId
       const state = {
         ...savedState,
+        highlightOnly: currentUrlState.highlightOnly,
         directoryId: directoryId || null,
         video:
           tab === 'video'

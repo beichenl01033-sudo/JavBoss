@@ -193,6 +193,7 @@ export async function fetchJavItem(id) {
 }
 
 export async function fetchJavs({
+  highlightOnly = false,
   limit = 25,
   offset = 0,
   search = '',
@@ -229,6 +230,7 @@ export async function fetchJavs({
   if (seed != null) params.set('seed', String(seed))
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
   if (directoryId) params.set('directory_id', String(directoryId))
+  if (highlightOnly) params.set('highlight_only', '1')
   const res = await apiFetch(`/jav?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -237,6 +239,7 @@ export async function fetchJavs({
 }
 
 export async function fetchJavFilterOptions({
+  highlightOnly = false,
   search = '',
   idolIds = [],
   tagIds = [],
@@ -277,6 +280,7 @@ export async function fetchJavFilterOptions({
   if (seriesSearch) params.set('series_search', seriesSearch)
   params.set('option_limit', String(optionLimit))
   if (directoryId) params.set('directory_id', String(directoryId))
+  if (highlightOnly) params.set('highlight_only', '1')
   const res = await apiFetch(`/jav/filter-options?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
