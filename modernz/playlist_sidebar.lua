@@ -42,6 +42,7 @@ local width_property = "user-data/javboss/playlist-sidebar-width"
 local overlay = mp.create_osd_overlay("ass-events")
 local visible_start = 1
 local visible_rows = 0
+local row_height = opts.row_height
 local last_playlist_pos = -1
 local render_pending = false
 local sidebar_visible = false
@@ -90,6 +91,12 @@ local function entry_label(entry)
         end
     end
     return ass_escape(label)
+end
+
+local function format_time(seconds)
+    local total = math.floor(math.max(0, tonumber(seconds) or 0))
+    if total >= 3600 then return string.format("%d:%02d:%02d", math.floor(total / 3600), math.floor(total % 3600 / 60), total % 60) end
+    return string.format("%d:%02d", math.floor(total / 60), total % 60)
 end
 
 local function publish_width(value)
@@ -183,6 +190,9 @@ local function render()
 
     local playlist = mp.get_property_native("playlist", {}) or {}
     local count = #playlist
+    local points = mp.get_property_native("user-data/javboss/playlist-highlights", {}) or {}
+    local point_playlist = next(points) ~= nil
+    row_height = point_playlist and math.max(56, opts.row_height) or opts.row_height
     local fullscreen = mp.get_property_native("fullscreen", false)
     local pixel_width, pixel_height = mp.get_osd_size()
     if not pixel_width or not pixel_height or pixel_width < 1 or pixel_height < 1
@@ -213,11 +223,11 @@ local function render()
     window_width = width
     window_height = height
     panel_bottom = math.max(
-        opts.header_height + opts.footer_height + opts.row_height,
+        opts.header_height + opts.footer_height + row_height,
         height - opts.control_bar_height
     )
     local previous_visible_rows = visible_rows
-    visible_rows = math.max(1, math.floor((panel_bottom - opts.header_height - opts.footer_height) / opts.row_height))
+    visible_rows = math.max(1, math.floor((panel_bottom - opts.header_height - opts.footer_height) / row_height))
     local current = playlist_position(playlist)
     if current ~= last_playlist_pos or visible_rows ~= previous_visible_rows then
         ensure_current_visible(current, count)
@@ -237,7 +247,7 @@ local function render()
         pane_left + 18,
         math.floor(opts.header_height / 2),
         sidebar_font,
-        ass_escape(opts.title)
+        ass_escape(point_playlist and "亮点播放列表" or opts.title)
     )
     parts[#parts + 1] = string.format(
         "{\\an6\\pos(%d,%d)\\bord0\\shad0\\fs16\\b0\\fsp0\\fn%s\\1c&HAAAEB8&}%d / %d",
@@ -257,20 +267,21 @@ local function render()
     local last_visible = math.min(count, visible_start + visible_rows - 1)
     for index = visible_start, last_visible do
         local entry = playlist[index]
+        local point = points[tostring(entry.id)]
         local row = index - visible_start
-        local top = opts.header_height + row * opts.row_height
-        local text_y = top + math.floor(opts.row_height / 2)
+        local top = opts.header_height + row * row_height
+        local text_y = top + math.floor(row_height / 2)
         local is_current = index == current
         if is_current then
-            append_rect(parts, pane_left + 8, top + 2, width - 8, top + opts.row_height - 2, "49331E", "00")
-            append_rect(parts, pane_left + 8, top + 2, pane_left + 12, top + opts.row_height - 2, "F0A34A", "00")
+            append_rect(parts, pane_left + 8, top + 2, width - 8, top + row_height - 2, "49331E", "00")
+            append_rect(parts, pane_left + 8, top + 2, pane_left + 12, top + row_height - 2, "F0A34A", "00")
         elseif row % 2 == 1 then
-            append_rect(parts, pane_left + 8, top + 2, width - 8, top + opts.row_height - 2, "20232A", "30")
+            append_rect(parts, pane_left + 8, top + 2, width - 8, top + row_height - 2, "20232A", "30")
         end
         parts[#parts + 1] = string.format(
             "{\\an4\\pos(%d,%d)\\bord0\\shad0\\fs15\\b0\\fsp0\\fn%s\\1c&H%s&}%02d",
             pane_left + 18,
-            text_y,
+            point and (top + 17) or text_y,
             sidebar_font,
             is_current and "F0A34A" or "858A94",
             index
@@ -278,17 +289,25 @@ local function render()
         parts[#parts + 1] = string.format(
             "{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs%d\\b%d\\fsp0\\fn%s\\1c&H%s&}%s",
             pane_left + 52,
-            text_y,
+            point and (top + 17) or text_y,
             pane_left + 14,
             top,
             width - 12,
-            top + opts.row_height,
-            opts.font_size,
+            top + row_height,
+            point and 16 or opts.font_size,
             is_current and 1 or 0,
             sidebar_font,
             is_current and "FFFFFF" or "CDD0D7",
-            entry_label(entry)
+            point and ass_escape(point.video_title) or entry_label(entry)
         )
+        if point then
+            local label = tostring(point.label or "")
+            if label == "" then label = "亮点 " .. tostring(point.number or "") end
+            parts[#parts + 1] = string.format(
+                "{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs13\\fn%s\\1c&HF0A34A&}★ %s · %s",
+                pane_left + 52, top + 39, pane_left + 14, top, width - 12, top + row_height,
+                sidebar_font, format_time(point.time), ass_escape(label))
+        end
     end
 
     append_rect(parts, pane_left, panel_bottom - opts.footer_height, width, panel_bottom, "111319", "10")
@@ -368,7 +387,7 @@ local function play_clicked_row()
         end
         return
     end
-    local row = math.floor((mouse_y - opts.header_height) / opts.row_height)
+    local row = math.floor((mouse_y - opts.header_height) / row_height)
     if row < 0 or row >= visible_rows then
         return
     end
@@ -508,7 +527,7 @@ mp.set_key_bindings({
 }, section, "force")
 mp.disable_key_bindings(section)
 
-for _, property in ipairs({"playlist", "playlist-pos", "fullscreen", "osd-dimensions", "display-hidpi-scale", "user-data/javboss/playlist-titles"}) do
+for _, property in ipairs({"playlist", "playlist-pos", "fullscreen", "osd-dimensions", "display-hidpi-scale", "user-data/javboss/playlist-titles", "user-data/javboss/playlist-highlights"}) do
     mp.observe_property(property, "native", request_render)
 end
 
