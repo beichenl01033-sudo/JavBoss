@@ -168,7 +168,8 @@ func buildInputConfContent() (string, error) {
 	}
 
 	lines = append(lines, "SPACE cycle pause")
-	lines = append(lines, "MBTN_LEFT_DBL cycle fullscreen")
+	lines = append(lines, "MBTN_LEFT script-binding javboss_control/canvas-click")
+	lines = append(lines, "MBTN_LEFT_DBL script-binding javboss_control/canvas-double-click")
 	lines = append(lines, buildEscapeHotkeyBinding())
 	return strings.Join(lines, "\n") + "\n", nil
 }

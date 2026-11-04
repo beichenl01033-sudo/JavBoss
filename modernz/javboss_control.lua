@@ -20,6 +20,60 @@ local clip_a = nil
 local clip_b = nil
 local clip_request_sequence = 0
 
+-- Delay a canvas single click until MPV's double-click interval has expired.
+-- Forced OSC/sidebar sections keep owning their buttons; dragging is ignored.
+local canvas_click_timer = nil
+local canvas_down = nil
+local canvas_suppressed_until = 0
+
+local function cancel_canvas_click()
+    if canvas_click_timer then canvas_click_timer:kill(); canvas_click_timer = nil end
+    canvas_down = nil
+end
+
+local function canvas_position()
+    local x, y = mp.get_mouse_pos()
+    local w, h = mp.get_osd_size()
+    local scale = mp.get_property_number("display-hidpi-scale", 1) or 1
+    local sidebar = mp.get_property_number("user-data/javboss/playlist-sidebar-width", 0) or 0
+    if not x or not y or not w or not h or w <= 0 or h <= 0 then return nil end
+    if x < 0 or x >= w - sidebar or y < 0 or y >= h - 96 * scale then return nil end
+    return x, y, scale
+end
+
+local function canvas_click(event)
+    if event.canceled then canvas_down = nil; cancel_canvas_click(); return end
+    if event.event == "down" then
+        cancel_canvas_click()
+        local x, y, scale = canvas_position()
+        canvas_down = x and { x = x, y = y, scale = scale } or nil
+    elseif event.event == "up" then
+        local down = canvas_down
+        canvas_down = nil
+        local x, y = canvas_position()
+        if not down or not x or mp.get_time() < canvas_suppressed_until then return end
+        if (x - down.x)^2 + (y - down.y)^2 > (6 * down.scale)^2 then return end
+        local delay = math.max(0, mp.get_property_number("input-doubleclick-time", 300) or 300) / 1000
+        canvas_click_timer = mp.add_timeout(delay + 0.02, function()
+            canvas_click_timer = nil
+            if mp.get_property("path") then mp.commandv("cycle", "pause") end
+        end)
+    end
+end
+
+local function canvas_double_click()
+    cancel_canvas_click()
+    canvas_down = nil
+    if not canvas_position() then return end
+    canvas_suppressed_until = mp.get_time() + math.max(0.1, (mp.get_property_number("input-doubleclick-time", 300) or 300) / 1000)
+    mp.commandv("cycle", "fullscreen")
+end
+
+mp.add_key_binding(nil, "canvas-click", canvas_click, { complex = true })
+mp.add_key_binding(nil, "canvas-double-click", canvas_double_click)
+mp.register_event("start-file", cancel_canvas_click)
+mp.register_event("end-file", cancel_canvas_click)
+
 local function osd(message, duration)
     mp.osd_message(message, duration or 2.5)
 end

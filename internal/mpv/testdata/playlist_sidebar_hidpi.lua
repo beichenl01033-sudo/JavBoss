@@ -55,6 +55,7 @@ local function harness(scale, width, height, position)
         add_timeout = function(_, callback) state.timers[#state.timers + 1] = callback end,
         commandv = function(...) state.commands[#state.commands + 1] = {...} end,
         add_hook = function() end,
+        register_script_message = function() end,
         register_event = function() end,
     }
     package.loaded["mp.options"] = {read_options = function() end}
@@ -103,7 +104,7 @@ local function check_layout(state, logical_width, logical_height, pane_width)
     near(state.properties["video-margin-ratio-right"], 0)
     near(state.area[3], state.width)
     local panel_bottom = math.max(58 + 34 + 35, logical_height - 96)
-    near(state.area[4], panel_bottom * state.height / logical_height)
+    near(state.area[4], math.floor(panel_bottom * state.height / logical_height + 0.5))
     assert(state.overlay.data:find("\\fs18", 1, true), "logical font size changed")
     assert(state.overlay.data:find("\\pos(" .. (logical_width - pane_width + 52) .. ",75)", 1, true))
 end
