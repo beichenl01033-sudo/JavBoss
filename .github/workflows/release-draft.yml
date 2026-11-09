@@ -27,7 +27,8 @@ jobs:
         platform:
           - windows-x86_64
           - macos-arm64
-    runs-on: ${{ fromJson('{"windows-x86_64":"ubuntu-latest","macos-arm64":"macos-latest"}')[matrix.platform] }}
+    # Cross-build Apple Silicon on Intel hosts to avoid ARM runner capacity shortages.
+    runs-on: ${{ fromJson('{"windows-x86_64":"ubuntu-latest","macos-arm64":"macos-15-intel"}')[matrix.platform] }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -61,6 +62,10 @@ jobs:
 
       - name: Build release
         run: bash scripts/cli.sh release "${{ matrix.platform }}" "$RELEASE"
+
+      - name: Verify Apple Silicon binary
+        if: ${{ matrix.platform == 'macos-arm64' }}
+        run: test "$(lipo -archs "release/javboss-${RELEASE}-macos-arm64/javboss")" = arm64
 
       - name: Upload release asset
         uses: actions/upload-artifact@v6
