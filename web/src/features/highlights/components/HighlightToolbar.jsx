@@ -11,8 +11,11 @@ import { configFlag } from '@/utils/config'
 import { generateRandomSeed } from '@/utils/urlState'
 import { zh } from '@/utils/i18n'
 
-export default function HighlightToolbar({ query, only, onOnlyChange }) {
+export default function HighlightToolbar({ query, only, without, onFilterChange }) {
   const highlightOnly = useStore((state) => state.highlightOnly)
+  const highlightExclude = useStore((state) => state.highlightExclude)
+  const filter =
+    (only ?? highlightOnly) ? 'with' : (without ?? highlightExclude) ? 'without' : 'all'
   const enabled = useStore((state) => configFlag(state.config?.mpv_enabled, true))
   const [snapshot, setSnapshot] = useState(null)
   const [preview, setPreview] = useState(false)
@@ -83,21 +86,32 @@ export default function HighlightToolbar({ query, only, onOnlyChange }) {
   }
   return (
     <>
-      <label className="filter-action-button cursor-pointer whitespace-nowrap">
-        <input
-          type="checkbox"
-          checked={only ?? highlightOnly}
+      <label className="filter-action-button whitespace-nowrap">
+        <span>{zh('亮点', 'Highlights')}</span>
+        <select
+          aria-label={zh('亮点筛选', 'Highlight filter')}
+          value={filter}
           onChange={(event) => {
-            if (onOnlyChange) onOnlyChange(event.target.checked)
-            else useStore.getState().setHighlightOnly(event.target.checked)
+            if (onFilterChange) onFilterChange(event.target.value)
+            else useStore.getState().setHighlightFilter(event.target.value)
           }}
-        />
-        <span>{zh('仅看有亮点', 'With highlights')}</span>
+          className="bg-transparent"
+        >
+          <option value="all">{zh('全部', 'All')}</option>
+          <option value="with">{zh('仅看有亮点', 'With highlights')}</option>
+          <option value="without">{zh('仅看无亮点', 'Without highlights')}</option>
+        </select>
       </label>
       <button
         type="button"
-        disabled={!enabled}
-        title={!enabled ? zh('当前模式不支持 MPV 播放', 'MPV playback is unavailable') : undefined}
+        disabled={!enabled || filter === 'without'}
+        title={
+          filter === 'without'
+            ? zh('请切换为全部或有亮点后播放', 'Select all or with highlights to play')
+            : !enabled
+              ? zh('当前模式不支持 MPV 播放', 'MPV playback is unavailable')
+              : undefined
+        }
         className="filter-action-button whitespace-nowrap disabled:opacity-40"
         onClick={open}
       >

@@ -21,7 +21,6 @@ import {
   normalizeIdolProfileFilters,
 } from '@/constants/jav'
 import { zh } from '@/utils/i18n'
-import DirectoryFilter from '@/features/directories/components/DirectoryFilter'
 
 function isModifiedClick(event) {
   return Boolean(
@@ -409,10 +408,6 @@ export default function TopBar({
   searchInput,
   selectedCount = 0,
   selectedFavoriteGroupId = null,
-  directories = [],
-  selectedDirectoryId = null,
-  onDirectoryChange,
-  useHostPaths = false,
 }) {
   const headerRef = useRef(null)
   const favoriteMenuRef = useRef(null)
@@ -508,11 +503,6 @@ export default function TopBar({
           JavBoss
         </button>
         <div className="filter-topbar__controls flex-wrap">
-          {!isJavMode ? (
-            <div className="relative -ml-1 mr-4 shrink-0 border-r border-slate-200 pr-4">
-              <VideoDirectoryFilter />
-            </div>
-          ) : null}
           {isJavMode && !isJavDownload ? (
             <div
               ref={favoriteMenuRef}
@@ -595,14 +585,7 @@ export default function TopBar({
             </button>
           ) : null}
 
-          {isJavMode && !isJavDownload ? (
-            <DirectoryFilter
-              directories={directories}
-              selectedDirectoryId={selectedDirectoryId}
-              onChange={onDirectoryChange}
-              useHostPaths={useHostPaths}
-            />
-          ) : null}
+          {!isJavDownload ? <VideoDirectoryFilter /> : null}
 
           {(!isJavMode || javTab === 'list') && <HighlightToolbar />}
 

@@ -194,6 +194,7 @@ export async function fetchJavItem(id) {
 
 export async function fetchJavs({
   highlightOnly = false,
+  highlightExclude = false,
   limit = 25,
   offset = 0,
   search = '',
@@ -210,6 +211,7 @@ export async function fetchJavs({
   seed = null,
   favoriteGroupId = null,
   directoryId = null,
+  subdirectory = '',
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -229,8 +231,12 @@ export async function fetchJavs({
   if (sort) params.set('sort', sort)
   if (seed != null) params.set('seed', String(seed))
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
-  if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   if (highlightOnly) params.set('highlight_only', '1')
+  else if (highlightExclude) params.set('highlight_only', '0')
   const res = await apiFetch(`/jav?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -240,6 +246,7 @@ export async function fetchJavs({
 
 export async function fetchJavFilterOptions({
   highlightOnly = false,
+  highlightExclude = false,
   search = '',
   idolIds = [],
   tagIds = [],
@@ -258,6 +265,7 @@ export async function fetchJavFilterOptions({
   seriesSearch = '',
   optionLimit = 120,
   directoryId = null,
+  subdirectory = '',
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -279,8 +287,12 @@ export async function fetchJavFilterOptions({
   if (studioSearch) params.set('studio_search', studioSearch)
   if (seriesSearch) params.set('series_search', seriesSearch)
   params.set('option_limit', String(optionLimit))
-  if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   if (highlightOnly) params.set('highlight_only', '1')
+  else if (highlightExclude) params.set('highlight_only', '0')
   const res = await apiFetch(`/jav/filter-options?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -329,9 +341,12 @@ export function resolveJavSampleImages(id) {
   return request
 }
 
-export async function fetchJavPrefixes({ directoryId = null } = {}) {
+export async function fetchJavPrefixes({ directoryId = null, subdirectory = '' } = {}) {
   const params = new URLSearchParams()
-  if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   const query = params.toString()
   const res = await apiFetch(`/jav/prefixes${query ? `?${query}` : ''}`)
   if (!res.ok) {
@@ -340,9 +355,12 @@ export async function fetchJavPrefixes({ directoryId = null } = {}) {
   return res.json()
 }
 
-export async function fetchJavTags({ directoryId = null } = {}) {
+export async function fetchJavTags({ directoryId = null, subdirectory = '' } = {}) {
   const params = new URLSearchParams()
-  if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   const query = params.toString()
   const res = await apiFetch(`/jav/tags${query ? `?${query}` : ''}`)
   if (!res.ok) {
@@ -543,6 +561,7 @@ export async function fetchJavIdols({
   favoriteGroupId = null,
   profileFilters = {},
   directoryId = null,
+  subdirectory = '',
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -551,7 +570,10 @@ export async function fetchJavIdols({
   if (search) params.set('search', search)
   if (sort) params.set('sort', sort)
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
-  if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   for (const key of ['height', 'age', 'cup', 'bust', 'waist', 'hips']) {
     const value = profileFilters?.[key]
     if (!value?.enabled) continue
@@ -643,6 +665,7 @@ export async function fetchJavStudios({
   search = '',
   favoriteGroupId = null,
   directoryId = null,
+  subdirectory = '',
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -650,7 +673,10 @@ export async function fetchJavStudios({
   params.set('offset', String(offset))
   if (search) params.set('search', search)
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
-  if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   const res = await apiFetch(`/jav/studios?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -722,6 +748,7 @@ export async function fetchJavSeries({
   search = '',
   favoriteGroupId = null,
   directoryId = null,
+  subdirectory = '',
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -729,7 +756,10 @@ export async function fetchJavSeries({
   params.set('offset', String(offset))
   if (search) params.set('search', search)
   if (favoriteGroupId) params.set('favorite_group_id', String(favoriteGroupId))
-  if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId) {
+    params.set('directory_id', String(directoryId))
+    if (subdirectory) params.set('subdirectory', subdirectory)
+  }
   const res = await apiFetch(`/jav/series?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)

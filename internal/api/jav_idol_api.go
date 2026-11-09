@@ -37,11 +37,12 @@ func listJavIdols(c *gin.Context) {
 	if !ok {
 		return
 	}
-	directoryIDs, ok := queryDirectoryIDs(c)
+	directoryIDs, subdirectory, ok := parseVideoDirectoryFilter(c)
 	if !ok {
 		return
 	}
 
+	filters.Subdirectory = subdirectory
 	items, total, err := dbpkg.Default().ListJavIdols(c.Request.Context(), search, sort, limit, offset, directoryIDs, favoriteGroupID, filters)
 	if err != nil {
 		logging.Error("list jav idols: %v", err)

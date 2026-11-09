@@ -31,6 +31,7 @@ export default function useLibraryFilters({
     setSelectedTags,
     searchTerm,
     highlightOnly,
+    highlightExclude,
     javSearchTerm,
     javTagOptions,
     config,
@@ -59,6 +60,7 @@ export default function useLibraryFilters({
       setSelectedTags: state.setSelectedTags,
       searchTerm: state.searchTerm,
       highlightOnly: state.highlightOnly,
+      highlightExclude: state.highlightExclude,
       javSearchTerm: state.javSearchTerm,
       javTagOptions: state.javTagOptions,
       config: state.config,
@@ -305,11 +307,13 @@ export default function useLibraryFilters({
   const activeFilterItems = useMemo(() => {
     if (!isJavMode) {
       const items = []
-      if (highlightOnly)
+      if (highlightOnly || highlightExclude)
         items.push({
           key: 'highlights',
-          label: zh('仅看有亮点', 'With highlights'),
-          onRemove: () => updateVideoFilters({ highlightOnly: false }),
+          label: highlightExclude
+            ? zh('仅看无亮点', 'Without highlights')
+            : zh('仅看有亮点', 'With highlights'),
+          onRemove: () => updateVideoFilters({ highlightOnly: false, highlightExclude: false }),
         })
       const activeSearch = String(searchTerm || '').trim()
       if (activeSearch) {
@@ -363,11 +367,13 @@ export default function useLibraryFilters({
       })
     }
     if (javTab !== 'list') return items
-    if (highlightOnly)
+    if (highlightOnly || highlightExclude)
       items.push({
         key: 'highlights',
-        label: zh('仅看有亮点', 'With highlights'),
-        onRemove: () => updateJavFilters({ highlightOnly: false }),
+        label: highlightExclude
+          ? zh('仅看无亮点', 'Without highlights')
+          : zh('仅看有亮点', 'With highlights'),
+        onRemove: () => updateJavFilters({ highlightOnly: false, highlightExclude: false }),
       })
 
     javIdolIds.forEach((id) => {
@@ -453,6 +459,7 @@ export default function useLibraryFilters({
   }, [
     config,
     highlightOnly,
+    highlightExclude,
     seriesItems,
     javItems,
     isJavMode,
@@ -486,6 +493,7 @@ export default function useLibraryFilters({
       setSearchInput('')
       updateVideoFilters({
         highlightOnly: false,
+        highlightExclude: false,
         selectedTags: [],
         searchTerm: '',
         randomMode: false,
@@ -498,6 +506,7 @@ export default function useLibraryFilters({
     if (javTab === 'list') {
       Object.assign(updates, {
         highlightOnly: false,
+        highlightExclude: false,
         javIdolIds: [],
         javTags: [],
         javStudioId: null,

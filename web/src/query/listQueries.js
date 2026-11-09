@@ -12,6 +12,7 @@ export const directoryScopeKey = (state) =>
 export function videoQuery(state) {
   return {
     highlightOnly: Boolean(state.highlightOnly),
+    highlightExclude: Boolean(state.highlightExclude),
     limit: state.pageSize,
     offset: state.randomMode ? 0 : (state.page - 1) * state.pageSize,
     tags: state.selectedTags || [],
@@ -27,6 +28,7 @@ export function videoQuery(state) {
 export function javQuery(state) {
   return {
     highlightOnly: Boolean(state.highlightOnly),
+    highlightExclude: Boolean(state.highlightExclude),
     limit: state.javPageSize,
     offset: state.javRandomMode ? 0 : (state.javPage - 1) * state.javPageSize,
     search: state.javSearchTerm || '',
@@ -43,6 +45,7 @@ export function javQuery(state) {
     sort: resolveJavSort(state).sort,
     seed: state.javRandomMode ? state.javRandomSeed : null,
     directoryId: state.selectedDirectoryId,
+    subdirectory: state.videoSubdirectory || '',
   }
 }
 
@@ -55,6 +58,7 @@ export function idolQuery(state) {
     favoriteGroupId: state.idolFavoriteGroupId,
     profileFilters: normalizeIdolProfileFilters(state.idolProfileFilters),
     directoryId: state.selectedDirectoryId,
+    subdirectory: state.videoSubdirectory || '',
   }
 }
 
@@ -64,6 +68,7 @@ export const studioQuery = (state) => ({
   search: state.javSearchTerm || '',
   favoriteGroupId: state.studioFavoriteGroupId,
   directoryId: state.selectedDirectoryId,
+  subdirectory: state.videoSubdirectory || '',
 })
 export const seriesQuery = (state) => ({
   limit: state.seriesPageSize,
@@ -71,6 +76,7 @@ export const seriesQuery = (state) => ({
   search: state.javSearchTerm || '',
   favoriteGroupId: state.seriesFavoriteGroupId,
   directoryId: state.selectedDirectoryId,
+  subdirectory: state.videoSubdirectory || '',
 })
 
 export const listQueryKey = (query, state) =>

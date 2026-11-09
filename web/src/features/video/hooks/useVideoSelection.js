@@ -31,6 +31,8 @@ export default function useVideoSelection({
     selectedDirectoryId,
     videoDirectoryId,
     videoSubdirectory,
+    highlightOnly,
+    highlightExclude,
   } = useStore(
     useShallow((state) => ({
       selectedVideoIds: state.selectedVideoIds,
@@ -49,6 +51,8 @@ export default function useVideoSelection({
       selectedDirectoryId: state.selectedDirectoryId,
       videoDirectoryId: state.videoDirectoryId,
       videoSubdirectory: state.videoSubdirectory,
+      highlightOnly: state.highlightOnly,
+      highlightExclude: state.highlightExclude,
     }))
   )
   const [selectionOpsOpen, setSelectionOpsOpen] = useState(false)
@@ -424,6 +428,8 @@ export default function useVideoSelection({
         directoryId: videoDirectoryId || selectedDirectoryId,
         hideJav: videoHideJav,
         subdirectory: videoSubdirectory,
+        highlightOnly,
+        highlightExclude,
       })
       const batch = Array.isArray(response?.items) ? response.items : []
       items.push(...batch)
@@ -446,6 +452,8 @@ export default function useVideoSelection({
     videoHideJav,
     videoDirectoryId,
     videoSubdirectory,
+    highlightOnly,
+    highlightExclude,
     videoTempSort,
     videos,
   ])

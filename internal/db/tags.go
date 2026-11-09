@@ -73,12 +73,13 @@ func (store *Store) RenameTag(ctx context.Context, id int64, newName string) err
 // ListTags returns all tags ordered by name with attached active location counts.
 // By default it includes locations already associated with JAV metadata.
 func (store *Store) ListTags(ctx context.Context, directoryIDs []int64, hideJav ...bool) ([]TagCount, error) {
+	hide := len(hideJav) > 0 && hideJav[0]
+	return store.ListTagsInSubdirectory(ctx, directoryIDs, hide, "")
+}
+
+func (store *Store) ListTagsInSubdirectory(ctx context.Context, directoryIDs []int64, hideRecognizedJav bool, subdirectory string) ([]TagCount, error) {
 	var tags []TagCount
-	hideRecognizedJav := false
-	if len(hideJav) > 0 {
-		hideRecognizedJav = hideJav[0]
-	}
-	countWhere := activeDirectoryWhereSQL("d")
+	countWhere := activeDirectoryWhereSQL("d") + locationSubdirectorySQL("vl", subdirectory)
 	if hideRecognizedJav {
 		countWhere += " AND vl.jav_id IS NULL"
 	}

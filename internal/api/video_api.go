@@ -32,7 +32,8 @@ import (
 // for cumulative watch time; legacy play_count sort values are aliases.
 // directory_id selects an enabled library root. subdirectory is a relative directory
 // within that root; it includes all descendants and requires directory_id.
-// highlight_only=1 requires at least one saved highlight before pagination/counting.
+// highlight_only=1 requires a saved highlight, =0 selects unmarked files, and
+// omission selects all. Filtering happens before pagination/counting.
 func listVideos(c *gin.Context) {
 	if !syncHighlightIndex(c, false) {
 		return
@@ -48,10 +49,6 @@ func listVideos(c *gin.Context) {
 	sort := strings.TrimSpace(c.Query("sort"))
 	hideJav := queryBool(c, "hide_jav", false)
 	seedParam := strings.TrimSpace(c.Query("seed"))
-	directoryIDs, ok := queryDirectoryIDs(c)
-	if !ok {
-		return
-	}
 	var seed *int64
 	if seedParam != "" {
 		parsed, err := strconv.ParseInt(seedParam, 10, 64)
@@ -62,7 +59,8 @@ func listVideos(c *gin.Context) {
 		seed = &parsed
 	}
 
-	filter := dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory, HighlightOnly: queryBool(c, "highlight_only", false)}
+	// highlight_only=0 explicitly selects unmarked videos; omission selects all.
+	filter := dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory, HighlightOnly: queryBool(c, "highlight_only", false), HighlightExclude: c.Query("highlight_only") != "" && !queryBool(c, "highlight_only", true)}
 	videos, err := dbpkg.Default().ListVideos(c.Request.Context(), limit, offset, tagFilter, search, sort, seed, directoryIDs, filter)
 	if err != nil {
 		logging.Error("list videos error: %v", err)
