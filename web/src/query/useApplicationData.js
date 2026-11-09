@@ -10,6 +10,7 @@ export default function useApplicationData() {
   const {
     directories,
     selectedDirectoryId,
+    videoSubdirectory,
     loadConfig,
     loadDirectories,
     loadTags,
@@ -19,6 +20,7 @@ export default function useApplicationData() {
     useShallow((state) => ({
       directories: state.directories,
       selectedDirectoryId: state.selectedDirectoryId,
+      videoSubdirectory: state.videoSubdirectory,
       loadConfig: state.loadConfig,
       loadDirectories: state.loadDirectories,
       loadTags: state.loadTags,
@@ -32,11 +34,12 @@ export default function useApplicationData() {
     () =>
       [
         `selected:${selectedDirectoryId || 0}`,
+        `subdirectory:${videoSubdirectory || ''}`,
         ...directories
           .filter((directory) => !directory?.is_delete)
           .map((directory) => `${directory.id}:${directory.enabled !== false ? '1' : '0'}`),
       ].join(','),
-    [directories, selectedDirectoryId]
+    [directories, selectedDirectoryId, videoSubdirectory]
   )
 
   useEffect(() => {

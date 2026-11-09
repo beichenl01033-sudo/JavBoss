@@ -167,11 +167,9 @@ test(
     )
     const layout = await evaluate(`(() => {
       const button = ${trigger};
-      const wrapper = button.parentElement;
-      return {first: wrapper === document.querySelector('.filter-topbar__controls').firstElementChild,
-        border: getComputedStyle(wrapper).borderRightWidth};
+      return {afterSearch: Boolean(document.querySelector('.filter-search').compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)};
     })()`)
-    assert.deepEqual(layout, { first: true, border: '1px' })
+    assert.deepEqual(layout, { afterSearch: true })
     await evaluate(`window.testStore.setState({searchTerm: 'movie'})`)
     await waitFor(`document.querySelector('[aria-label="Remove filter Search: movie"]')`)
     await evaluate(

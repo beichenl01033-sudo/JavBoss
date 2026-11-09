@@ -127,18 +127,13 @@ export default function useUrlStateSync({
       const state = {
         ...savedState,
         highlightOnly: currentUrlState.highlightOnly,
+        highlightExclude: currentUrlState.highlightExclude,
         directoryId: directoryId || null,
-        video:
-          tab === 'video'
-            ? {
-                ...savedState.video,
-                directoryId: directoryId || null,
-                subdirectory:
-                  directoryId && savedState.video.directoryId === directoryId
-                    ? savedState.video.subdirectory
-                    : '',
-              }
-            : savedState.video,
+        video: {
+          ...savedState.video,
+          directoryId: directoryId || null,
+          subdirectory: directoryId ? currentUrlState.video.subdirectory : '',
+        },
       }
       const nextUrl = buildUrlFromState(state, location.pathname)
       const scroll = saved?.scroll || { x: 0, y: 0 }

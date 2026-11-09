@@ -1,9 +1,10 @@
 import { apiFetch, apiError, jsonHeaders } from '@/api/client'
 
-export async function fetchTags({ hideJav = false, directoryId = null } = {}) {
+export async function fetchTags({ hideJav = false, directoryId = null, subdirectory = '' } = {}) {
   const params = new URLSearchParams()
   params.set('hide_jav', hideJav ? '1' : '0')
   if (directoryId) params.set('directory_id', String(directoryId))
+  if (directoryId && subdirectory) params.set('subdirectory', subdirectory)
   const query = params.toString()
   const res = await apiFetch(`/tags${query ? `?${query}` : ''}`)
   if (!res.ok) throw await apiError(res)

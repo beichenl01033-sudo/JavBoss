@@ -27,6 +27,8 @@ import (
 
 type javFilterQuery struct {
 	HighlightOnly     bool
+	HighlightExclude  bool
+	Subdirectory      string
 	IdolIDs           []int64
 	TagIDs            []int64
 	Search            string
@@ -40,14 +42,20 @@ type javFilterQuery struct {
 }
 
 func parseJavFilterQuery(c *gin.Context) (javFilterQuery, bool) {
+	_, subdirectory, valid := parseVideoDirectoryFilter(c)
+	if !valid {
+		return javFilterQuery{}, false
+	}
 	query := javFilterQuery{
-		HighlightOnly: queryBool(c, "highlight_only", false),
-		IdolIDs:       parseInt64CSV(c.Query("idol_ids")),
-		TagIDs:        parseInt64CSV(c.Query("tag_ids")),
-		Search:        strings.TrimSpace(c.Query("search")),
-		Prefix:        strings.TrimSpace(c.Query("prefix")),
-		StudioID:      -1,
-		SoloOnly:      queryBool(c, "solo", false),
+		HighlightOnly:    queryBool(c, "highlight_only", false),
+		HighlightExclude: c.Query("highlight_only") != "" && !queryBool(c, "highlight_only", true),
+		Subdirectory:     subdirectory,
+		IdolIDs:          parseInt64CSV(c.Query("idol_ids")),
+		TagIDs:           parseInt64CSV(c.Query("tag_ids")),
+		Search:           strings.TrimSpace(c.Query("search")),
+		Prefix:           strings.TrimSpace(c.Query("prefix")),
+		StudioID:         -1,
+		SoloOnly:         queryBool(c, "solo", false),
 	}
 	if studioParam := strings.TrimSpace(c.Query("studio_id")); studioParam != "" {
 		parsed, err := strconv.ParseInt(studioParam, 10, 64)
@@ -94,7 +102,9 @@ func parseJavFilterQuery(c *gin.Context) (javFilterQuery, bool) {
 
 // searchJav accepts sort=watched (longest first) or watched_asc (shortest first)
 // for cumulative watch time; legacy play_count sort values are aliases.
-// highlight_only=1 selects works with a marked video in the visible directory scope.
+// directory_id and subdirectory share the video directory tree's recursive scope.
+// highlight_only=1 selects marked files, =0 selects unmarked files, and omission
+// selects all. Only matching files are returned in each work's playback options.
 func searchJav(c *gin.Context) {
 	if !syncHighlightIndex(c, false) {
 		return
@@ -123,6 +133,8 @@ func searchJav(c *gin.Context) {
 
 	items, total, err := dbpkg.Default().SearchJavWithPrefixFilters(c.Request.Context(), filterQuery.IdolIDs, filterQuery.TagIDs, filterQuery.Search, filterQuery.Prefix, sort, limit, offset, seed, directoryIDs, dbpkg.JavSearchFilters{
 		HighlightOnly:     filterQuery.HighlightOnly,
+		HighlightExclude:  filterQuery.HighlightExclude,
+		Subdirectory:      filterQuery.Subdirectory,
 		StudioID:          filterQuery.StudioID,
 		SeriesID:          filterQuery.SeriesID,
 		SoloOnly:          filterQuery.SoloOnly,
@@ -162,6 +174,8 @@ func listJavFilterOptions(c *gin.Context) {
 		directoryIDs,
 		dbpkg.JavSearchFilters{
 			HighlightOnly:     filterQuery.HighlightOnly,
+			HighlightExclude:  filterQuery.HighlightExclude,
+			Subdirectory:      filterQuery.Subdirectory,
 			StudioID:          filterQuery.StudioID,
 			SeriesID:          filterQuery.SeriesID,
 			SoloOnly:          filterQuery.SoloOnly,
@@ -191,7 +205,11 @@ func listJavPrefixes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := dbpkg.Default().ListJavPrefixes(c.Request.Context(), directoryIDs)
+	_, subdirectory, valid := parseVideoDirectoryFilter(c)
+	if !valid {
+		return
+	}
+	items, err := dbpkg.Default().ListJavPrefixes(c.Request.Context(), directoryIDs, subdirectory)
 	if err != nil {
 		logging.Error("list jav prefixes error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载 JAV 番号前缀失败", "Failed to load JAV code prefixes")
@@ -456,7 +474,11 @@ func listJavTags(c *gin.Context) {
 	if !ok {
 		return
 	}
-	tags, err := dbpkg.Default().ListJavTags(c.Request.Context(), directoryIDs)
+	_, subdirectory, valid := parseVideoDirectoryFilter(c)
+	if !valid {
+		return
+	}
+	tags, err := dbpkg.Default().ListJavTags(c.Request.Context(), directoryIDs, subdirectory)
 	if err != nil {
 		logging.Error("list jav tags error: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载 JAV 标签失败", "Failed to load JAV tags")

@@ -11,6 +11,7 @@ export async function fetchVideos({
   hideJav = false,
   subdirectory = '',
   highlightOnly = false,
+  highlightExclude = false,
   signal,
 } = {}) {
   const params = new URLSearchParams()
@@ -26,6 +27,7 @@ export async function fetchVideos({
   if (seed != null) params.set('seed', String(seed))
   params.set('hide_jav', hideJav ? '1' : '0')
   if (highlightOnly) params.set('highlight_only', '1')
+  else if (highlightExclude) params.set('highlight_only', '0')
   const res = await apiFetch(`/videos?${params.toString()}`, { signal })
   if (!res.ok) throw await apiError(res)
   const data = await res.json()

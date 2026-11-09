@@ -14,22 +14,50 @@ import (
 
 // VideoFilter narrows the active locations returned by ListVideos and CountVideos.
 type VideoFilter struct {
-	HideJav       bool
-	Subdirectory  string
-	HighlightOnly bool
+	HideJav          bool
+	Subdirectory     string
+	HighlightOnly    bool
+	HighlightExclude bool
 }
 
 func applyVideoSubdirectoryFilter(query *gorm.DB, filters []VideoFilter) *gorm.DB {
 	if len(filters) > 0 && filters[0].HighlightOnly {
 		query = query.Where("video_location.video_id IN (SELECT id FROM video WHERE highlight_count > 0)")
+	} else if len(filters) > 0 && filters[0].HighlightExclude {
+		query = query.Where("video_location.video_id IN (SELECT id FROM video WHERE COALESCE(highlight_count, 0) = 0)")
 	}
 	if len(filters) == 0 || filters[0].Subdirectory == "" || filters[0].Subdirectory == "." {
 		return query
 	}
-	prefix := strings.TrimRight(filters[0].Subdirectory, "/") + "/"
+	return applyLocationSubdirectory(query, "video_location", filters[0].Subdirectory)
+}
+
+func applyLocationSubdirectory(query *gorm.DB, alias, subdirectory string) *gorm.DB {
+	if subdirectory == "" || subdirectory == "." {
+		return query
+	}
+	prefix := strings.TrimRight(subdirectory, "/") + "/"
 	// Compare literal, case-sensitive prefixes including the separator. SQL LIKE
 	// would treat % and _ in directory names as wildcards and fold ASCII case.
-	return query.Where("substr(video_location.relative_path, 1, length(?)) = ? COLLATE BINARY", prefix, prefix)
+	return query.Where("substr("+alias+".relative_path, 1, length(?)) = ? COLLATE BINARY", prefix, prefix)
+}
+
+func firstSubdirectory(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+// Used in existing scalar/aggregate SQL expressions. Escape the literal rather
+// than interpreting percent, underscore, or quotes as SQL syntax.
+func locationSubdirectorySQL(alias, subdirectory string) string {
+	if subdirectory == "" || subdirectory == "." {
+		return ""
+	}
+	prefix := strings.TrimRight(subdirectory, "/") + "/"
+	literal := "'" + strings.ReplaceAll(prefix, "'", "''") + "'"
+	return " AND substr(" + alias + ".relative_path, 1, length(" + literal + ")) = " + literal + " COLLATE BINARY"
 }
 
 type VideoDirectory struct {

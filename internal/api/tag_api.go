@@ -26,14 +26,15 @@ type tagsBatchDeleteRequest struct {
 }
 
 func listTags(c *gin.Context) {
-	directoryIDs, ok := queryDirectoryIDs(c)
+	directoryIDs, subdirectory, ok := parseVideoDirectoryFilter(c)
 	if !ok {
 		return
 	}
-	tags, err := dbpkg.Default().ListTags(
+	tags, err := dbpkg.Default().ListTagsInSubdirectory(
 		c.Request.Context(),
 		directoryIDs,
 		queryBool(c, "hide_jav", false),
+		subdirectory,
 	)
 	if err != nil {
 		logging.Error("list tags error: %v", err)

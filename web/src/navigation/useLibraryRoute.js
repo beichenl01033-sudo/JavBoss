@@ -13,6 +13,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
     config,
     viewMode,
     highlightOnly,
+    highlightExclude,
     page,
     searchTerm,
     selectedDirectoryId,
@@ -55,6 +56,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       config: state.config,
       viewMode: state.viewMode,
       highlightOnly: state.highlightOnly,
+      highlightExclude: state.highlightExclude,
       page: state.page,
       searchTerm: state.searchTerm,
       selectedDirectoryId: state.selectedDirectoryId,
@@ -141,7 +143,10 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
         useStore.setState({
           viewMode: 'jav',
           highlightOnly: Boolean(parsed.highlightOnly),
+          highlightExclude: Boolean(parsed.highlightExclude),
           selectedDirectoryId: parsedDirectoryId,
+          videoDirectoryId: parsedDirectoryId,
+          videoSubdirectory: parsedDirectoryId ? parsed.video.subdirectory : '',
           videoTempSort: '',
           javTab: jav.tab,
           javRandomMode: jav.tab === 'list' ? jav.random : false,
@@ -191,6 +196,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       useStore.setState({
         viewMode: 'video',
         highlightOnly: Boolean(parsed.highlightOnly),
+        highlightExclude: Boolean(parsed.highlightExclude),
         javTempSort: '',
         idolTempSort: '',
         videoTempSort: video.random ? '' : video.tempSort,
@@ -198,8 +204,8 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
         randomSeed: video.random ? video.seed : null,
         searchTerm: video.search,
         selectedDirectoryId: parsedDirectoryId,
-        videoDirectoryId: video.directoryId || parsedDirectoryId,
-        videoSubdirectory: video.directoryId ? video.subdirectory : '',
+        videoDirectoryId: parsedDirectoryId,
+        videoSubdirectory: parsedDirectoryId ? video.subdirectory : '',
         page: video.random ? 1 : video.page,
       })
       setSearchInput(video.search)
@@ -224,6 +230,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
         {
           viewMode,
           highlightOnly,
+          highlightExclude,
           page,
           searchTerm,
           selectedDirectoryId,
@@ -299,6 +306,7 @@ export default function useLibraryRoute({ setJavSearchInput, setSearchInput, con
       tagsByName,
       viewMode,
       highlightOnly,
+      highlightExclude,
       javStudioName,
       javSeriesName,
     ]

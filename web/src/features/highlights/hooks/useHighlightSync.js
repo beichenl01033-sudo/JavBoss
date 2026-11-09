@@ -33,7 +33,7 @@ export default function useHighlightSync() {
             })),
           }))
           const state = useStore.getState()
-          if (changed && state.highlightOnly) {
+          if (changed && (state.highlightOnly || state.highlightExclude)) {
             if (state.viewMode === 'video') void state.loadVideos({ force: true, reconcile: true })
             else if (state.javTab === 'list') void state.loadJavs({ force: true, reconcile: true })
           }

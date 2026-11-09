@@ -1,5 +1,9 @@
 export function javBulkQuery(state, sort) {
   return {
+    directoryId: state.selectedDirectoryId || null,
+    subdirectory: state.videoSubdirectory || '',
+    highlightOnly: Boolean(state.highlightOnly),
+    highlightExclude: Boolean(state.highlightExclude),
     search: state.javSearchTerm || '',
     idolIds: state.javIdolIds,
     tagIds: state.javTags,

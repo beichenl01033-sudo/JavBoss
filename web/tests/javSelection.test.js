@@ -6,6 +6,9 @@ test('bulk selection retains every JAV filter and the resolved sort', () => {
   assert.deepEqual(
     javBulkQuery(
       {
+        selectedDirectoryId: 7,
+        videoSubdirectory: 'clips',
+        highlightExclude: true,
         javSearchTerm: 'example',
         javIdolIds: [1, 2],
         javTags: [3],
@@ -21,6 +24,10 @@ test('bulk selection retains every JAV filter and the resolved sort', () => {
       'release_date_asc'
     ),
     {
+      directoryId: 7,
+      subdirectory: 'clips',
+      highlightOnly: false,
+      highlightExclude: true,
       search: 'example',
       idolIds: [1, 2],
       tagIds: [3],

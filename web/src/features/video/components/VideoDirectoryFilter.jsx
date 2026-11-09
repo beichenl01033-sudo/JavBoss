@@ -15,7 +15,7 @@ import { displayHostPath, hostPathsEnabled } from '@/utils/hostPath'
 export default function VideoDirectoryFilter() {
   const { directoryId, subdirectory, directories, setDirectory, useHostPaths } = useStore(
     useShallow((state) => ({
-      directoryId: state.videoDirectoryId,
+      directoryId: state.selectedDirectoryId || state.videoDirectoryId,
       subdirectory: state.videoSubdirectory,
       directories: state.directories,
       setDirectory: state.setVideoDirectoryFilter,

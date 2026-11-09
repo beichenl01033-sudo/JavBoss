@@ -40,6 +40,7 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
     javSort,
     javSortRules,
     selectedDirectoryId,
+    videoSubdirectory,
   } = useStore(
     useShallow((state) => ({
       javPageSize: state.javPageSize,
@@ -50,6 +51,7 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
       javSort: state.javSort,
       javSortRules: state.javSortRules,
       selectedDirectoryId: state.selectedDirectoryId,
+      videoSubdirectory: state.videoSubdirectory,
     }))
   )
   const [page, setPage] = useState(1)
@@ -59,6 +61,8 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
   const [error, setError] = useState('')
   const globalHighlightOnly = useStore((state) => state.highlightOnly)
   const [highlightOnly, setHighlightOnly] = useState(globalHighlightOnly)
+  const globalHighlightExclude = useStore((state) => state.highlightExclude)
+  const [highlightExclude, setHighlightExclude] = useState(globalHighlightExclude)
   const [highlightRevision, setHighlightRevision] = useState(0)
   useEffect(() => {
     const refresh = () => setHighlightRevision((current) => current + 1)
@@ -90,7 +94,9 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
       offset: (page - 1) * pageSize,
       sort,
       highlightOnly,
+      highlightExclude,
       directoryId: selectedDirectoryId,
+      subdirectory: videoSubdirectory,
       signal: controller.signal,
       ...filters,
     })
@@ -105,7 +111,17 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [filters, page, pageSize, selectedDirectoryId, sort, highlightOnly, highlightRevision])
+  }, [
+    filters,
+    page,
+    pageSize,
+    selectedDirectoryId,
+    videoSubdirectory,
+    sort,
+    highlightOnly,
+    highlightExclude,
+    highlightRevision,
+  ])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 })
@@ -143,10 +159,17 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-5">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <HighlightToolbar
-            query={{ ...filters, sort, directoryId: selectedDirectoryId }}
+            query={{
+              ...filters,
+              sort,
+              directoryId: selectedDirectoryId,
+              subdirectory: videoSubdirectory,
+            }}
             only={highlightOnly}
-            onOnlyChange={(value) => {
-              setHighlightOnly(value)
+            without={highlightExclude}
+            onFilterChange={(value) => {
+              setHighlightOnly(value === 'with')
+              setHighlightExclude(value === 'without')
               setPage(1)
             }}
           />

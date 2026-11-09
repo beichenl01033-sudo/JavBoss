@@ -47,12 +47,24 @@ export function createVideoSlice({ set, get, lists }) {
     selectedVideoMeta: {},
     searchTerm: '',
     highlightOnly: false,
-    setHighlightOnly: (value) => set({ highlightOnly: Boolean(value), page: 1, javPage: 1 }),
+    highlightExclude: false,
+    setHighlightOnly: (value) =>
+      set({ highlightOnly: Boolean(value), highlightExclude: false, page: 1, javPage: 1 }),
+    setHighlightFilter: (value) =>
+      set({
+        highlightOnly: value === 'with',
+        highlightExclude: value === 'without',
+        page: 1,
+        javPage: 1,
+      }),
     selectedDirectoryId: null,
     videoDirectoryId: null,
     videoSubdirectory: '',
-    setVideoDirectoryFilter: (directory) =>
+    setVideoDirectoryFilter: (directory) => {
+      get().invalidateTagRequests()
+      get().invalidateFavoriteRequests()
       set({
+        ...directoryScopeResetState(),
         selectedDirectoryId: directory?.directory_id || null,
         videoDirectoryId: directory?.directory_id || null,
         videoSubdirectory: directory?.path || '',
@@ -62,7 +74,8 @@ export function createVideoSlice({ set, get, lists }) {
         randomSeed: null,
         videoTempSort: '',
         page: 1,
-      }),
+      })
+    },
     sortOrder: 'recent',
     videoTempSort: '',
     randomMode: false,

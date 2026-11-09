@@ -21,8 +21,8 @@ export function createTagSlice({ get, set }) {
     tags: [],
     javTagOptions: [],
     loadTags: async (options = {}) => {
-      const { videoHideJav, selectedDirectoryId } = get()
-      const key = `tags|${selectedDirectoryId || 'all'}|${videoHideJav ? 'hide-jav' : 'show-jav'}`
+      const { videoHideJav, selectedDirectoryId, videoSubdirectory } = get()
+      const key = `tags|${selectedDirectoryId || 'all'}|${videoSubdirectory || ''}|${videoHideJav ? 'hide-jav' : 'show-jav'}`
       if (tagFetchInFlight && tagFetchInFlightKey === key) {
         return tagFetchInFlight
       }
@@ -35,6 +35,7 @@ export function createTagSlice({ get, set }) {
           const tags = await fetchTags({
             hideJav: videoHideJav,
             directoryId: selectedDirectoryId,
+            subdirectory: videoSubdirectory,
           })
           set({ tags })
           lastTagFetchKey = key
@@ -52,8 +53,8 @@ export function createTagSlice({ get, set }) {
       return tagFetchInFlight
     },
     loadJavTags: async (options = {}) => {
-      const { selectedDirectoryId } = get()
-      const key = `jav-tags|${selectedDirectoryId || 'all'}`
+      const { selectedDirectoryId, videoSubdirectory } = get()
+      const key = `jav-tags|${selectedDirectoryId || 'all'}|${videoSubdirectory || ''}`
       if (javTagFetchInFlight && javTagFetchInFlightKey === key) {
         const pending = javTagFetchInFlight
         if (!options.force) return pending
@@ -72,7 +73,10 @@ export function createTagSlice({ get, set }) {
       javTagFetchInFlightKey = key
       javTagFetchInFlight = (async () => {
         try {
-          const tags = await fetchJavTags({ directoryId: selectedDirectoryId })
+          const tags = await fetchJavTags({
+            directoryId: selectedDirectoryId,
+            subdirectory: videoSubdirectory,
+          })
           set({ javTagOptions: tags })
           lastJavTagFetchKey = key
           return tags

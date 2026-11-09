@@ -20,7 +20,14 @@ export async function collectHighlightVideos({ fetcher, query, jav = false, sign
   let offset = 0
   for (;;) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    const result = await fetcher({ ...query, highlightOnly: true, limit: 200, offset, signal })
+    const result = await fetcher({
+      ...query,
+      highlightOnly: true,
+      highlightExclude: false,
+      limit: 200,
+      offset,
+      signal,
+    })
     const items = result?.items || []
     videos.push(...(jav ? items.flatMap((item) => item.videos || []) : items))
     offset += items.length
