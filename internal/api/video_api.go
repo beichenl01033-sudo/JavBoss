@@ -500,10 +500,13 @@ func playVideoFile(c *gin.Context) {
 	}
 	videoID := resolvePlaybackVideoID(c.Request.Context(), req.VideoID, dirPath, fullPath)
 	dataDir := ""
+	coverDir := ""
 	if cfg := common.CurrentConfig(); cfg != nil {
 		dataDir = filepath.Dir(cfg.DatabasePath)
+		coverDir = cfg.JavCoverDir
 	}
 	if err := mpv.PlayVideo(fullPath, mpv.PlayOptions{
+		Cover:            playlistCoverResolver(dbpkg.Default(), dataDir, coverDir, videoID, 0),
 		NewWatchReporter: localPlaybackReporter(videoID, 0, dirPath, fullPath),
 		DataDir:          dataDir,
 		VideoID:          videoID,
@@ -563,6 +566,10 @@ func playVideoPlaylist(c *gin.Context) {
 	dataDir := ""
 	if cfg := common.CurrentConfig(); cfg != nil {
 		dataDir = filepath.Dir(cfg.DatabasePath)
+	}
+	coverDir := ""
+	if cfg := common.CurrentConfig(); cfg != nil {
+		coverDir = cfg.JavCoverDir
 	}
 	items := make([]mpv.PlaylistItem, 0, len(req.Items))
 	playlistStartIndex := req.StartIndex
@@ -644,6 +651,7 @@ func playVideoPlaylist(c *gin.Context) {
 		baseItem := mpv.PlaylistItem{
 			Path:  fullPath,
 			Title: location.Filename,
+			Cover: playlistCoverResolver(dbpkg.Default(), dataDir, coverDir, videoID, location.ID),
 			OnStarted: func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()

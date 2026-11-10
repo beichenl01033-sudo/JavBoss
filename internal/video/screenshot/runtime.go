@@ -2,6 +2,7 @@ package screenshot
 
 import (
 	"context"
+	"os"
 	"sync/atomic"
 
 	"javboss/internal/db"
@@ -9,6 +10,21 @@ import (
 )
 
 var active atomic.Pointer[queue]
+
+// CachedThumbnailPath never schedules extraction or reads the video, including
+// on unmounted network drives. It uses the same timestamp as GetThumbnail.
+func CachedThumbnailPath(dataDir string, video *models.Video) (string, bool) {
+	if video == nil || dataDir == "" {
+		return "", false
+	}
+	second, ok := pickScreenshotSecond(video.DurationSec)
+	if !ok {
+		return "", false
+	}
+	path := screenshotPath(dataDir, video.ID, second)
+	info, err := os.Stat(path)
+	return path, err == nil && info.Mode().IsRegular()
+}
 
 // Start configures and starts thumbnail generation. Call once before consumers.
 // An empty directory disables the queue; CaptureFile remains available.
