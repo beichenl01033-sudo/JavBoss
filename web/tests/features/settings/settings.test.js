@@ -35,6 +35,12 @@ test('settings drafts stay local and a reopened dialog reads persisted values', 
   assert.equal(javDraft.javHideSeriesInput, true)
   assert.equal(javDraft.javEntityOpenModeInput, 'page')
   assert.equal(model.createJavSettingsDraft(state).javEntityOpenModeInput, 'modal')
+  assert.equal(javDraft.javHighSaturationTagsInput, true)
+  assert.equal(
+    model.createJavSettingsDraft({ ...state, config: { jav_high_saturation_tags: 'false' } }, 'jav')
+      .javHighSaturationTagsInput,
+    false
+  )
 })
 
 test('saving video settings persists normalized values and clamps the current page', async (t) => {
@@ -338,7 +344,7 @@ test('saving one display tab only persists its fields and updates its list state
     }
     assert.equal(
       Object.keys(payload).length,
-      { jav: 17, idol: 4, studio: 2, series: 2, tag: 1 }[tab]
+      { jav: 18, idol: 4, studio: 2, series: 2, tag: 1 }[tab]
     )
     assert.deepEqual(changes, tab === 'tag' ? [] : [[tab, true]])
     if (tab !== 'jav') {

@@ -110,13 +110,16 @@ export default function ClipTasksView({ onToast }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
       {error ? (
-        <div role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div
+          role="alert"
+          className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+        >
           {error}
         </div>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-ui-faint">
           {zh(
             `进行中 ${counts.active} · 已完成 ${counts.completed} · 失败 ${counts.failed}`,
             `${counts.active} active · ${counts.completed} completed · ${counts.failed} failed`
@@ -127,18 +130,18 @@ export default function ClipTasksView({ onToast }) {
           onClick={() => setRefreshVersion((current) => current + 1)}
           aria-label={zh('刷新剪辑任务', 'Refresh clip tasks')}
           title={zh('刷新剪辑任务', 'Refresh clip tasks')}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-[16px] text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-[16px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:border-ui-border dark:bg-ui-surface dark:text-ui-secondary dark:hover:bg-ui-canvas dark:hover:text-ui-text"
         >
           <RefreshOutlinedIcon fontSize="inherit" />
         </button>
       </div>
 
       {loading ? (
-        <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-gray-400">
+        <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-gray-400 dark:border-ui-border dark:bg-ui-surface dark:text-ui-faint">
           {zh('加载剪辑任务…', 'Loading clip tasks...')}
         </div>
       ) : items.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-gray-400">
+        <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-gray-400 dark:border-ui-border dark:bg-ui-surface dark:text-ui-faint">
           {zh(
             '暂无剪辑任务。在 MPV 中选定开始点和结束点后提交即可。',
             'No clip tasks yet. Choose start and end points in MPV, then submit the clip.'
@@ -153,23 +156,23 @@ export default function ClipTasksView({ onToast }) {
             return (
               <article
                 key={item.id}
-                className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+                className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-ui-border dark:bg-ui-surface"
               >
                 <div className="flex flex-wrap items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold text-gray-900">
+                      <span className="truncate text-sm font-semibold text-gray-900 dark:text-ui-text">
                         {item.output_filename || item.source_filename}
                       </span>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-4 ${
                           item.status === 'completed'
-                            ? 'bg-emerald-100 text-emerald-700'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
                             : item.status === 'failed'
-                              ? 'bg-red-100 text-red-700'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
                               : item.status === 'canceled'
-                                ? 'bg-gray-100 text-gray-500'
-                                : 'bg-blue-100 text-blue-700'
+                                ? 'bg-gray-100 text-gray-500 dark:bg-ui-muted dark:text-ui-faint'
+                                : 'bg-blue-100 text-blue-700 dark:bg-ui-blue-surface dark:text-blue-300'
                         }`}
                       >
                         {statusLabel(item)}
@@ -195,7 +198,7 @@ export default function ClipTasksView({ onToast }) {
                       </span>
                       {item.network_optimized ? (
                         <span
-                          className="inline-flex rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-violet-700"
+                          className="inline-flex rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
                           title={zh(
                             '先在本机临时目录剪辑，再写回网络盘',
                             'Clip locally first, then write back to the network drive'
@@ -204,12 +207,12 @@ export default function ClipTasksView({ onToast }) {
                           {zh('NAS 加速', 'NAS optimized')}
                         </span>
                       ) : null}
-                      <span className="text-[10px] font-medium text-gray-500">
+                      <span className="text-[10px] font-medium text-gray-500 dark:text-ui-faint">
                         {formatTime(item.created_at)}
                       </span>
                     </div>
                     <div
-                      className="mt-0.5 truncate text-[11px] text-gray-400"
+                      className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-ui-faint"
                       title={item.output_path}
                     >
                       {formatSeconds(item.start_seconds)} – {formatSeconds(item.end_seconds)} ·{' '}
@@ -224,7 +227,7 @@ export default function ClipTasksView({ onToast }) {
                         onClick={() => runAction(item, revealClipTask)}
                         aria-label={zh('打开剪辑所在位置', 'Reveal clip in folder')}
                         title={zh('打开所在位置', 'Reveal in folder')}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-[16px] text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-[16px] text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-ui-border dark:bg-ui-surface dark:text-ui-secondary dark:hover:bg-ui-canvas"
                       >
                         <FolderOpenOutlinedIcon fontSize="inherit" />
                       </button>
@@ -242,7 +245,7 @@ export default function ClipTasksView({ onToast }) {
                         }
                         aria-label={zh('取消剪辑任务', 'Cancel clip task')}
                         title={zh('取消剪辑任务', 'Cancel clip task')}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-[16px] text-amber-700 disabled:opacity-50"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-[16px] text-amber-700 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
                       >
                         <CancelOutlinedIcon fontSize="inherit" />
                       </button>
@@ -254,14 +257,14 @@ export default function ClipTasksView({ onToast }) {
                         onClick={() => runAction(item, deleteClipTask)}
                         aria-label={zh('移除剪辑记录', 'Remove clip task')}
                         title={zh('移除记录', 'Remove record')}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-[16px] text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-[16px] text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-ui-border dark:bg-ui-surface dark:text-ui-secondary dark:hover:bg-ui-canvas"
                       >
                         <DeleteOutlineOutlinedIcon fontSize="inherit" />
                       </button>
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-ui-muted">
                   <div
                     className={`h-full rounded-full transition-all ${
                       item.status === 'failed'
@@ -275,7 +278,7 @@ export default function ClipTasksView({ onToast }) {
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <div className="mt-0.5 text-right text-[11px] text-gray-400">
+                <div className="mt-0.5 text-right text-[11px] text-gray-400 dark:text-ui-faint">
                   {progress.toFixed(1)}%
                 </div>
               </article>

@@ -10,12 +10,12 @@ function HighlightRow({ item, busy, onPlay, onEdit }) {
   const [deleting, setDeleting] = useState(false)
   const [label, setLabel] = useState(item.label)
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-ui-canvas">
       <button
         type="button"
         disabled={busy}
         onClick={onPlay}
-        className="font-mono text-sm font-semibold text-sky-700 hover:underline"
+        className="font-mono text-sm font-semibold text-sky-700 hover:underline dark:text-sky-300"
         aria-label={zh(
           `播放亮点 ${formatHighlightTime(item.time)}`,
           `Play highlight ${formatHighlightTime(item.time)}`
@@ -37,15 +37,18 @@ function HighlightRow({ item, busy, onPlay, onEdit }) {
             required
             value={label}
             onChange={(event) => setLabel(event.target.value)}
-            className="min-w-0 flex-1 rounded border px-2 py-1 text-sm"
+            className="form-field min-w-0 flex-1 rounded border px-2 py-1 text-sm"
           />
-          <button disabled={busy || !label.trim()} className="text-sm text-sky-700">
+          <button
+            disabled={busy || !label.trim()}
+            className="text-sm text-sky-700 dark:text-sky-300"
+          >
             {zh('保存', 'Save')}
           </button>
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="text-sm text-slate-500"
+            className="text-sm text-slate-500 dark:text-ui-faint"
           >
             {zh('取消', 'Cancel')}
           </button>
@@ -64,7 +67,7 @@ function HighlightRow({ item, busy, onPlay, onEdit }) {
             setEditing(true)
             setDeleting(false)
           }}
-          className="text-xs text-slate-500 hover:text-sky-700"
+          className="text-xs text-slate-500 hover:text-sky-700 dark:text-ui-faint dark:hover:text-sky-300"
         >
           {zh('重命名', 'Rename')}
         </button>
@@ -76,12 +79,16 @@ function HighlightRow({ item, busy, onPlay, onEdit }) {
           if (!deleting) setDeleting(true)
           else if (await onEdit(null)) setDeleting(false)
         }}
-        className="text-xs text-red-600"
+        className="text-xs text-red-600 dark:text-red-300"
       >
         {deleting ? zh('确认删除标记', 'Confirm remove mark') : zh('删除', 'Delete')}
       </button>
       {deleting && (
-        <button type="button" onClick={() => setDeleting(false)} className="text-xs text-slate-500">
+        <button
+          type="button"
+          onClick={() => setDeleting(false)}
+          className="text-xs text-slate-500 dark:text-ui-faint"
+        >
           {zh('取消', 'Cancel')}
         </button>
       )}
@@ -159,12 +166,12 @@ export default function HighlightModal({ videos, onClose }) {
       ariaLabel={zh('亮点', 'Highlights')}
       onClose={onClose}
       zIndex={1500}
-      contentClassName="flex max-h-[85vh] w-[min(42rem,calc(100vw-2rem))] flex-col rounded-xl bg-white shadow-2xl"
+      contentClassName="flex max-h-[85vh] w-[min(42rem,calc(100vw-2rem))] flex-col rounded-xl bg-white dark:bg-ui-surface shadow-2xl"
     >
       <header className="flex items-center justify-between border-b px-5 py-4">
         <div>
           <h2 className="font-semibold">★ {zh('亮点', 'Highlights')}</h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-ui-faint">
             {zh(
               '点击时间直接播放；删除仅移除标记，不删除视频。',
               'Click a time to play. Removing a mark does not delete the video.'
@@ -182,7 +189,7 @@ export default function HighlightModal({ videos, onClose }) {
       </header>
       <div className="space-y-5 overflow-y-auto p-5">
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-red-600 dark:text-red-300">
             {error}
           </p>
         )}
@@ -194,7 +201,9 @@ export default function HighlightModal({ videos, onClose }) {
             </h3>
             <div className="space-y-2">
               {!group.doc.items.length && (
-                <p className="text-sm text-slate-500">{zh('暂无亮点', 'No highlights')}</p>
+                <p className="text-sm text-slate-500 dark:text-ui-faint">
+                  {zh('暂无亮点', 'No highlights')}
+                </p>
               )}
               {group.doc.items.map((item, index) => (
                 <HighlightRow
