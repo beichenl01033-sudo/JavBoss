@@ -95,7 +95,7 @@ export default function HighlightToolbar({ query, only, without, onFilterChange 
             if (onFilterChange) onFilterChange(event.target.value)
             else useStore.getState().setHighlightFilter(event.target.value)
           }}
-          className="bg-transparent"
+          className="form-field bg-transparent"
         >
           <option value="all">{zh('全部', 'All')}</option>
           <option value="with">{zh('仅看有亮点', 'With highlights')}</option>
@@ -118,7 +118,7 @@ export default function HighlightToolbar({ query, only, without, onFilterChange 
         ★ {zh('播放亮点', 'Play highlights')}
       </button>
       {!snapshot && message && (
-        <span role="status" className="text-xs text-slate-500">
+        <span role="status" className="text-xs text-slate-500 dark:text-ui-faint">
           {message}
         </span>
       )}
@@ -127,7 +127,7 @@ export default function HighlightToolbar({ query, only, without, onFilterChange 
           ariaLabel={zh('播放亮点', 'Play highlights')}
           onClose={close}
           zIndex={1500}
-          contentClassName="w-[min(28rem,calc(100vw-2rem))] space-y-4 rounded-xl bg-white p-5 shadow-2xl"
+          contentClassName="w-[min(28rem,calc(100vw-2rem))] space-y-4 rounded-xl bg-white dark:bg-ui-surface p-5 shadow-2xl"
         >
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">
@@ -137,7 +137,7 @@ export default function HighlightToolbar({ query, only, without, onFilterChange 
               ×
             </button>
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-ui-faint">
             {zh(
               '包含所有分页。MPV 播放列表每行对应“视频 - 亮点”，点击任意一行直接播放。',
               'Includes every page. Each MPV playlist row is a video and highlight. Click any row to play it.'
@@ -159,7 +159,7 @@ export default function HighlightToolbar({ query, only, without, onFilterChange 
                 value={seconds}
                 disabled={busy}
                 onChange={(event) => setSeconds(Number(event.target.value))}
-                className="rounded border p-2"
+                className="form-field rounded border p-2"
               >
                 {[15, 30, 60, 120].map((value) => (
                   <option key={value} value={value}>
@@ -175,7 +175,7 @@ export default function HighlightToolbar({ query, only, without, onFilterChange 
               value={lead}
               disabled={busy}
               onChange={(event) => setLead(Number(event.target.value))}
-              className="rounded border p-2"
+              className="form-field rounded border p-2"
             >
               {[0, 3, 5, 10].map((value) => (
                 <option key={value} value={value}>
@@ -185,7 +185,7 @@ export default function HighlightToolbar({ query, only, without, onFilterChange 
             </select>
           </label>
           {message && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-red-600 dark:text-red-300">
               {message}
             </p>
           )}

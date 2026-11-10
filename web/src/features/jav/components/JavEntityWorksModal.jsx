@@ -135,21 +135,23 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
     <AppModal
       ariaLabel={title}
       className="p-4"
-      contentClassName="flex h-[92vh] w-[min(96rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
+      contentClassName="flex h-[92vh] w-[min(96rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-ui-border bg-white dark:bg-ui-surface shadow-2xl"
       onClose={onClose}
       zIndex={1250}
     >
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-100 px-5 py-3">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-100 px-5 py-3 dark:border-ui-border">
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold text-gray-900">{title}</h2>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <h2 className="truncate text-lg font-semibold text-gray-900 dark:text-ui-text">
+            {title}
+          </h2>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-ui-faint">
             {loading ? zh('加载中…', 'Loading…') : zh(`共 ${total} 部`, `${total} works`)}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-ui-faint dark:hover:bg-ui-muted dark:hover:text-ui-text"
           aria-label={zh('关闭相关作品浮层', 'Close related works overlay')}
         >
           <CloseRoundedIcon sx={{ fontSize: 22 }} />
@@ -189,11 +191,14 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
           />
         </div>
         {error ? (
-          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+          <div
+            role="alert"
+            className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 dark:bg-red-950 dark:text-red-300"
+          >
             {error}
           </div>
         ) : loading ? (
-          <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-gray-200 text-gray-500">
+          <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-gray-200 text-gray-500 dark:border-ui-border dark:text-ui-faint">
             {zh('加载中…', 'Loading…')}
           </div>
         ) : (
