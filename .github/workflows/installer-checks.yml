@@ -1,0 +1,49 @@
+name: Windows installer checks
+
+on:
+  push:
+    paths:
+      - scripts/install*.ps1
+      - scripts/cli/tests/install*.test.mjs
+      - .github/workflows/installer-checks.yml
+  pull_request:
+    paths:
+      - scripts/install*.ps1
+      - scripts/cli/tests/install*.test.mjs
+      - .github/workflows/installer-checks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  installer:
+    name: Installer (${{ matrix.powershell }})
+    runs-on: windows-2022
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        powershell: [powershell, pwsh]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Verify PowerShell runtime
+        env:
+          JAVBOSS_TEST_POWERSHELL: ${{ matrix.powershell }}
+        shell: pwsh
+        run: |
+          & $env:JAVBOSS_TEST_POWERSHELL -NoProfile -Command '$PSVersionTable.PSVersion; exit 0'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test Windows installers without network or production data
+        env:
+          JAVBOSS_TEST_POWERSHELL: ${{ matrix.powershell }}
+        shell: pwsh
+        run: node --test scripts/cli/tests/install.test.mjs scripts/cli/tests/install-personal.test.mjs

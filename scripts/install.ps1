@@ -176,6 +176,22 @@ function Compare-ReleaseVersions {
   return [Math]::Sign($ap.Count - $bp.Count)
 }
 
+function Test-PersonalReleaseSwitch {
+  param([string]$InstalledVersion, [string]$TargetVersion)
+
+  # The personal entry point pins a validated release from this repository.
+  # Allow switching channels only on the same base version, never a downgrade
+  # from a newer official base or a newer personal release.
+  if ($Repo -ine "beichenl01033-sudo/JavBoss" -or $PinnedVersion -cne $TargetVersion) {
+    return $false
+  }
+  if ($TargetVersion -cmatch '^(v[0-9]+\.[0-9]+\.[0-9]+)-personal\.[0-9]+(\+[0-9A-Za-z.-]+)?\z') {
+    $targetBase = $Matches[1]
+    return (($InstalledVersion -split '\+', 2)[0] -ceq $targetBase)
+  }
+  return $false
+}
+
 function Copy-ReleaseFiles {
   param([string]$SourceDir, [string]$InstallDir)
 
@@ -302,9 +318,14 @@ $url = $asset.Url
 
 if (Test-Path -LiteralPath (Join-Path $Dir "javboss.exe")) {
   $currentVersion = Get-InstalledVersion -InstallDir $Dir
-  if ((Compare-ReleaseVersions -Left $tag -Right $currentVersion) -le 0) {
+  $comparison = Compare-ReleaseVersions -Left $tag -Right $currentVersion
+  $personalSwitch = Test-PersonalReleaseSwitch -InstalledVersion $currentVersion -TargetVersion $tag
+  if ($comparison -le 0 -and -not $personalSwitch) {
     Write-Log "JavBoss $currentVersion is already installed; latest is $tag, no update needed"
     return
+  }
+  if ($personalSwitch) {
+    Write-Log "switching release channel: $currentVersion -> $tag ($Repo)"
   }
 }
 

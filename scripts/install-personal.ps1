@@ -21,6 +21,7 @@ try {
     throw "The latest personal release does not contain $assetName"
   }
 
+  Write-Host "[javboss] personal release selected: $repo / $version"
   $env:JAVBOSS_INSTALL_REPO = $repo
   $env:JAVBOSS_INSTALL_VERSION = $version
   $installer = Invoke-RestMethod -Uri $installerUrl -Headers @{ "User-Agent" = "JavBoss-Personal-Installer" }
