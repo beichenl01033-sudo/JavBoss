@@ -12,6 +12,7 @@ local opts = {
     footer_height = 34,
     control_bar_height = 96,
     row_height = 35,
+    show_covers = true,
     font_size = 18,
     font = "auto",
     scroll_rows = 3,
@@ -59,6 +60,24 @@ local click_armed = false
 local handle_hovered = false
 local handle_mouse_y = nil
 local controls_pinned = false
+local explicitly_opened = false
+local rows_dirty = true
+local rows, groups, entry_rows = {}, {}, {}
+local playlist_snapshot, points_snapshot, visuals = {}, {}, {}
+local images, collapsed_groups, bitmap_ids = {}, {}, {}
+local generation = ""
+local request_serial = 0
+local last_cover_request = ""
+local hit_rows = {}
+local enhanced = false
+local content_bottom = 0
+local thumbnail_overlay_id = 42
+local last_active_group = nil
+
+local function clear_bitmaps()
+    for id in pairs(bitmap_ids) do mp.commandv("overlay-remove", id) end
+    bitmap_ids = {}
+end
 
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
@@ -109,10 +128,13 @@ end
 local function pin_controls(value)
     if controls_pinned == value then return end
     controls_pinned = value
-    mp.commandv("script-message-to", "modernz", "osc-visibility", value and "always" or "auto")
+    mp.commandv("script-message-to", "modernz", "osc-visibility", value and "always" or "auto", "yes")
 end
 
 local function hide_sidebar()
+    clear_bitmaps()
+    mp.set_property_number("user-data/javboss/playlist-cover-count", 0)
+    last_cover_request = ""
     if sidebar_visible then
         overlay:remove()
         mp.disable_key_bindings(section)
@@ -123,6 +145,63 @@ local function hide_sidebar()
     handle_mouse_y = nil
     publish_width(0)
     pin_controls(false)
+end
+
+-- Visual rows never change the native playlist. Only consecutive points from
+-- the same video/file share a header, so reordered queues retain their order.
+local function refresh_rows()
+    playlist_snapshot = mp.get_property_native("playlist", {}) or {}
+    points_snapshot = mp.get_property_native("user-data/javboss/playlist-highlights", {}) or {}
+    visuals = mp.get_property_native("user-data/javboss/playlist-visuals", {}) or {}
+    local next_generation = tostring(visuals.generation or "")
+    if next_generation ~= generation then
+        clear_bitmaps()
+        generation = next_generation
+        images, collapsed_groups = {}, {}
+        last_cover_request, request_serial = "", 0
+        visible_start, last_playlist_pos = 1, -1
+        last_active_group = nil
+    end
+    enhanced = generation ~= "" and type(visuals.entries) == "table"
+    rows, groups, entry_rows = {}, {}, {}
+    local index = 1
+    local point_playlist = next(points_snapshot) ~= nil
+    while index <= #playlist_snapshot do
+        local entry = playlist_snapshot[index]
+        local point = points_snapshot[tostring(entry.id)]
+        local visual = (visuals.entries or {})[tostring(entry.id)] or {}
+        if enhanced and point then
+            local last = index
+            while last < #playlist_snapshot do
+                local candidate = playlist_snapshot[last + 1]
+                local next_point = points_snapshot[tostring(candidate.id)]
+                local next_visual = visuals.entries[tostring(candidate.id)] or {}
+                if not next_point or next_point.video_id ~= point.video_id or next_visual.key ~= visual.key then break end
+                last = last + 1
+            end
+            local group = {key=tostring(entry.id), first=index, last=last, cover=visual.key,
+                title=visual.title or point.video_title or entry_label(entry), number=#groups+1}
+            groups[#groups+1] = group
+            local header = {kind="group", index=index, height=64, group=group}
+            rows[#rows+1] = header
+            group.row = #rows
+            for item = index, last do
+                entry_rows[item] = group.row
+                if not collapsed_groups[group.key] then
+                    rows[#rows+1] = {kind="point", index=item, height=32, group=group}
+                    entry_rows[item] = #rows
+                end
+            end
+            index = last + 1
+        else
+            rows[#rows+1] = {kind="video", index=index,
+                height=enhanced and opts.show_covers and 64 or (point_playlist and math.max(56, opts.row_height) or opts.row_height),
+                cover=visual.key, title=visual.title}
+            entry_rows[index] = #rows
+            index = index + 1
+        end
+    end
+    rows_dirty = false
 end
 
 local function playlist_position(playlist)
@@ -170,15 +249,50 @@ local function append_rect(parts, x1, y1, x2, y2, color, alpha)
     )
 end
 
-local function ensure_current_visible(current, count)
-    local max_start = math.max(1, count - visible_rows + 1)
-    visible_start = clamp(visible_start, 1, max_start)
-    if current < visible_start then
-        visible_start = current
-    elseif current >= visible_start + visible_rows then
-        visible_start = current - visible_rows + 1
+local function ensure_current_visible(target, available)
+    visible_start = clamp(visible_start, 1, math.max(1, #rows))
+    if target < visible_start then visible_start = target end
+    local height = 0
+    for index = visible_start, target do height = height + rows[index].height end
+    while visible_start < target and height > available do
+        height = height - rows[visible_start].height
+        visible_start = visible_start + 1
     end
-    visible_start = clamp(visible_start, 1, max_start)
+end
+
+local function draw_cover(parts, key, x, y, slot, requests)
+    append_rect(parts, x, y, x+48, y+48, "30343D", "00")
+    local cover = key and images[key]
+    if cover and opts.show_covers then
+        -- ASS IDs are a separate namespace; do not reuse thumbfast's bitmap ID.
+        local id = slot - 1
+        if id >= thumbnail_overlay_id then id = id + 1 end
+        if id <= 63 then
+            local ok, _, err = pcall(mp.command_native, {name="overlay-add", id=id,
+                x=math.floor(x*scale_x+0.5), y=math.floor(y*scale_y+0.5), file=cover.path,
+                offset=0, fmt="bgra", w=cover.width, h=cover.height, stride=cover.width*4,
+                dw=math.floor(48*scale_x+0.5), dh=math.floor(48*scale_y+0.5)})
+            if ok and not err then bitmap_ids[id] = true; return end
+            images[key] = false
+        end
+    elseif key and images[key] == nil then
+        requests[#requests+1] = key
+    end
+    parts[#parts+1] = string.format("{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs10\\fn%s\\1c&H9297A2&}%s",
+        x+24, y+24, sidebar_font, images[key] == false and "无封面" or "封面")
+end
+
+local function request_covers(keys)
+    local unique, seen = {}, {}
+    for _, key in ipairs(keys) do
+        if not seen[key] and #unique < 63 then unique[#unique+1] = key; seen[key] = true end
+    end
+    local signature = generation .. ":" .. table.concat(unique, ",")
+    if #unique == 0 or signature == last_cover_request then return end
+    last_cover_request = signature
+    request_serial = request_serial + 1
+    mp.set_property_native("user-data/javboss/playlist-cover-request",
+        {generation=generation, serial=request_serial, keys=unique})
 end
 
 local function render()
@@ -188,15 +302,17 @@ local function render()
         return
     end
 
-    local playlist = mp.get_property_native("playlist", {}) or {}
+    if rows_dirty then refresh_rows() end
+    local playlist = playlist_snapshot
     local count = #playlist
-    local points = mp.get_property_native("user-data/javboss/playlist-highlights", {}) or {}
+    local points = points_snapshot
     local point_playlist = next(points) ~= nil
     row_height = point_playlist and math.max(56, opts.row_height) or opts.row_height
     local fullscreen = mp.get_property_native("fullscreen", false)
     local pixel_width, pixel_height = mp.get_osd_size()
     if not pixel_width or not pixel_height or pixel_width < 1 or pixel_height < 1
-        or (opts.auto_hide_single and count <= 1)
+        or count == 0
+        or (opts.auto_hide_single and count <= 1 and not point_playlist and not explicitly_opened)
         or (opts.hide_fullscreen and fullscreen) then
         hide_sidebar()
         return
@@ -223,23 +339,38 @@ local function render()
     window_width = width
     window_height = height
     panel_bottom = math.max(
-        opts.header_height + opts.footer_height + row_height,
+        opts.header_height + opts.footer_height + (enhanced and 64 or row_height),
         height - opts.control_bar_height
     )
-    local previous_visible_rows = visible_rows
-    visible_rows = math.max(1, math.floor((panel_bottom - opts.header_height - opts.footer_height) / row_height))
+    content_bottom = panel_bottom - opts.footer_height
+    local available = content_bottom - opts.header_height
     local current = playlist_position(playlist)
-    if current ~= last_playlist_pos or visible_rows ~= previous_visible_rows then
-        ensure_current_visible(current, count)
+    if current ~= last_playlist_pos then
+        local active_group = nil
+        for _, group in ipairs(groups) do
+            if current >= group.first and current <= group.last then
+                active_group = group.key
+                if active_group ~= last_active_group and collapsed_groups[group.key] then
+                    collapsed_groups[group.key] = nil
+                    refresh_rows()
+                end
+                break
+            end
+        end
+        last_active_group = active_group
+    end
+    if current ~= last_playlist_pos or width ~= overlay.res_x or height ~= overlay.res_y then
+        ensure_current_visible(entry_rows[current] or 1, available)
         last_playlist_pos = current
     else
-        visible_start = clamp(visible_start, 1, math.max(1, count - visible_rows + 1))
+        visible_start = clamp(visible_start, 1, math.max(1, #rows))
     end
 
     publish_width(pane_width * scale_x)
     pin_controls(true)
 
-    local parts = {}
+    clear_bitmaps()
+    local parts, requests = {}, {}
     append_rect(parts, pane_left, 0, width, panel_bottom, "17191F", "08")
     append_rect(parts, pane_left, opts.header_height - 1, width, opts.header_height, "424650", "00")
     parts[#parts + 1] = string.format(
@@ -264,51 +395,86 @@ local function render()
         sidebar_font
     )
 
-    local last_visible = math.min(count, visible_start + visible_rows - 1)
-    for index = visible_start, last_visible do
+    local top = opts.header_height
+    hit_rows, visible_rows = {}, 0
+    local cover_slot = 0
+    for row_index = visible_start, #rows do
+        local row = rows[row_index]
+        if top + row.height > content_bottom then break end
+        visible_rows = visible_rows + 1
+        hit_rows[#hit_rows+1] = {top=top, bottom=top+row.height, row=row}
+        local index = row.index
         local entry = playlist[index]
         local point = points[tostring(entry.id)]
-        local row = index - visible_start
-        local top = opts.header_height + row * row_height
-        local text_y = top + math.floor(row_height / 2)
-        local is_current = index == current
+        local text_y = top + math.floor(row.height / 2)
+        local is_current = index == current or (row.kind == "group" and current >= row.group.first and current <= row.group.last)
         if is_current then
-            append_rect(parts, pane_left + 8, top + 2, width - 8, top + row_height - 2, "49331E", "00")
-            append_rect(parts, pane_left + 8, top + 2, pane_left + 12, top + row_height - 2, "F0A34A", "00")
-        elseif row % 2 == 1 then
-            append_rect(parts, pane_left + 8, top + 2, width - 8, top + row_height - 2, "20232A", "30")
+            append_rect(parts, pane_left + 8, top + 2, width - 8, top + row.height - 2, "49331E", "00")
+            append_rect(parts, pane_left + 8, top + 2, pane_left + 12, top + row.height - 2, "F0A34A", "00")
+        elseif visible_rows % 2 == 0 then
+            append_rect(parts, pane_left + 8, top + 2, width - 8, top + row.height - 2, "20232A", "30")
         end
-        parts[#parts + 1] = string.format(
-            "{\\an4\\pos(%d,%d)\\bord0\\shad0\\fs15\\b0\\fsp0\\fn%s\\1c&H%s&}%02d",
-            pane_left + 18,
-            point and (top + 17) or text_y,
-            sidebar_font,
-            is_current and "F0A34A" or "858A94",
-            index
-        )
-        parts[#parts + 1] = string.format(
-            "{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs%d\\b%d\\fsp0\\fn%s\\1c&H%s&}%s",
-            pane_left + 52,
-            point and (top + 17) or text_y,
-            pane_left + 14,
-            top,
-            width - 12,
-            top + row_height,
-            point and 16 or opts.font_size,
-            is_current and 1 or 0,
-            sidebar_font,
-            is_current and "FFFFFF" or "CDD0D7",
-            point and ass_escape(point.video_title) or entry_label(entry)
-        )
-        if point then
+        if row.kind == "group" or (enhanced and opts.show_covers and row.kind == "video") then
+            local group = row.group
+            local text_left = pane_left + 18
+            if opts.show_covers then
+                cover_slot = cover_slot + 1
+                draw_cover(parts, group and group.cover or row.cover, pane_left+18, top+8, cover_slot, requests)
+                text_left = pane_left + 78
+            end
+            local title = group and group.title or row.title or entry.title or entry.filename or ""
+            parts[#parts+1] = string.format("{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs16\\b%d\\fn%s\\1c&H%s&}%s",
+                text_left, top+23, text_left, top, width-42, top+row.height,
+                is_current and 1 or 0, sidebar_font, is_current and "FFFFFF" or "CDD0D7", ass_escape(title))
+            local subtitle = group and string.format("%d 个亮点", group.last-group.first+1) or string.format("视频 %d / %d", index, count)
+            parts[#parts+1] = string.format("{\\an4\\pos(%d,%d)\\bord0\\shad0\\fs12\\fn%s\\1c&H9297A2&}%s", text_left, top+45, sidebar_font, subtitle)
+            if group then
+                parts[#parts+1] = string.format("{\\an5\\pos(%d,%d)\\bord0\\shad0\\fs18\\fn%s\\1c&HCDD0D7&}%s", width-25, text_y, sidebar_font, collapsed_groups[group.key] and "▸" or "▾")
+            end
+        elseif row.kind == "point" then
             local label = tostring(point.label or "")
             if label == "" then label = "亮点 " .. tostring(point.number or "") end
+            parts[#parts+1] = string.format("{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs14\\fn%s\\1c&H%s&}%s %s · %s",
+                pane_left+30, text_y, pane_left+18, top, width-14, top+row.height, sidebar_font,
+                is_current and "F0A34A" or "CDD0D7", is_current and "▶" or "★", format_time(point.time), ass_escape(label))
+        else
             parts[#parts + 1] = string.format(
-                "{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs13\\fn%s\\1c&HF0A34A&}★ %s · %s",
-                pane_left + 52, top + 39, pane_left + 14, top, width - 12, top + row_height,
-                sidebar_font, format_time(point.time), ass_escape(label))
+                "{\\an4\\pos(%d,%d)\\bord0\\shad0\\fs15\\b0\\fsp0\\fn%s\\1c&H%s&}%02d",
+                pane_left + 18,
+                point and (top + 17) or text_y,
+                sidebar_font,
+                is_current and "F0A34A" or "858A94",
+                index
+            )
+            parts[#parts + 1] = string.format(
+                "{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs%d\\b%d\\fsp0\\fn%s\\1c&H%s&}%s",
+                pane_left + 52,
+                point and (top + 17) or text_y,
+                pane_left + 14,
+                top,
+                width - 12,
+                top + row.height,
+                point and 16 or opts.font_size,
+                is_current and 1 or 0,
+                sidebar_font,
+                is_current and "FFFFFF" or "CDD0D7",
+                point and ass_escape(point.video_title) or entry_label(entry)
+            )
+            if point then
+                local label = tostring(point.label or "")
+                if label == "" then label = "亮点 " .. tostring(point.number or "") end
+                parts[#parts + 1] = string.format(
+                    "{\\an4\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs13\\fn%s\\1c&HF0A34A&}★ %s · %s",
+                    pane_left + 52, top + 39, pane_left + 14, top, width - 12, top + row.height,
+                    sidebar_font, format_time(point.time), ass_escape(label))
+            end
         end
+        top = top + row.height
     end
+    request_covers(requests)
+    local cover_count = 0
+    for _ in pairs(bitmap_ids) do cover_count = cover_count + 1 end
+    mp.set_property_number("user-data/javboss/playlist-cover-count", cover_count)
 
     append_rect(parts, pane_left, panel_bottom - opts.footer_height, width, panel_bottom, "111319", "10")
     local handle_active = dragging or handle_hovered
@@ -366,8 +532,13 @@ local function scroll(direction)
     if not sidebar_visible then
         return
     end
-    local playlist = mp.get_property_native("playlist", {}) or {}
-    local max_start = math.max(1, #playlist - visible_rows + 1)
+    local max_start = math.max(1, #rows)
+    local height = 0
+    for index = #rows, 1, -1 do
+        if height + rows[index].height > content_bottom - opts.header_height then break end
+        height = height + rows[index].height
+        max_start = index
+    end
     visible_start = clamp(visible_start + direction * opts.scroll_rows, 1, max_start)
     request_render()
 end
@@ -376,8 +547,10 @@ local function play_clicked_row()
     if not sidebar_visible then
         return
     end
+    -- Ignore a click on a stale frame while MPV is replacing/reordering entries.
+    if rows_dirty then request_render(); return end
     local mouse_x, mouse_y = get_mouse_position()
-    if not mouse_y then
+    if not mouse_y or not mouse_x or mouse_x < pane_left or mouse_x > window_width then
         return
     end
     if mouse_y < opts.header_height then
@@ -387,19 +560,30 @@ local function play_clicked_row()
         end
         return
     end
-    local row = math.floor((mouse_y - opts.header_height) / row_height)
-    if row < 0 or row >= visible_rows then
-        return
-    end
-    local index = visible_start + row
-    local playlist = mp.get_property_native("playlist", {}) or {}
-    if index >= 1 and index <= #playlist then
-        mp.commandv("playlist-play-index", index - 1)
+    for _, hit in ipairs(hit_rows) do
+        if mouse_y >= hit.top and mouse_y < hit.bottom then
+            local row = hit.row
+            if row.kind == "group" then
+                if mouse_x >= window_width - 44 then
+                    collapsed_groups[row.group.key] = not collapsed_groups[row.group.key]
+                    rows_dirty = true
+                    request_render()
+                    return
+                end
+                collapsed_groups[row.group.key] = nil
+                rows_dirty = true
+                request_render()
+            end
+            local index = row.index
+            mp.commandv("playlist-play-index", index - 1)
+            return
+        end
     end
 end
 
 local function show_sidebar()
     sidebar_collapsed = false
+    explicitly_opened = true
     mp.commandv("script-message-to", "javboss_highlight_sidebar", "hide")
     request_render()
 end
@@ -527,9 +711,33 @@ mp.set_key_bindings({
 }, section, "force")
 mp.disable_key_bindings(section)
 
-for _, property in ipairs({"playlist", "playlist-pos", "fullscreen", "osd-dimensions", "display-hidpi-scale", "user-data/javboss/playlist-titles", "user-data/javboss/playlist-highlights"}) do
+for _, property in ipairs({"playlist-pos", "fullscreen", "osd-dimensions", "display-hidpi-scale"}) do
     mp.observe_property(property, "native", request_render)
 end
+for _, property in ipairs({"playlist", "user-data/javboss/playlist-titles", "user-data/javboss/playlist-highlights", "user-data/javboss/playlist-visuals"}) do
+    mp.observe_property(property, "native", function() rows_dirty = true; request_render() end)
+end
+
+mp.register_script_message("covers-ready", function(version, data)
+    if version ~= generation then return end
+    local result = utils.parse_json(data)
+    if type(result) ~= "table" then return end
+    for key, cover in pairs(result) do
+        if cover == false or (type(cover) == "table" and type(cover.path) == "string"
+            and cover.width == 128 and cover.height == 128) then images[key] = cover end
+    end
+    request_render()
+end)
+
+mp.register_script_message("thumbfast-info", function(data)
+    local info = utils.parse_json(data)
+    local id = type(info) == "table" and tonumber(info.overlay_id)
+    if id and id >= 0 and id <= 63 and id ~= thumbnail_overlay_id then
+        clear_bitmaps()
+        thumbnail_overlay_id = id
+        request_render()
+    end
+end)
 
 mp.add_hook("on_unload", 50, save_position_before_unload)
 mp.register_script_message("show", show_sidebar)

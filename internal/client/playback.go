@@ -92,6 +92,7 @@ func (c *Client) handlePlay(w http.ResponseWriter, r *http.Request) {
 	mediaURL := c.localBaseURL + "/__client/media/" + token
 	dataDir := c.clientDataDir()
 	if err := c.playVideo(mediaURL, mpv.PlayOptions{
+		Cover:                  c.playlistCoverResolver(c.remoteState(), request.VideoID, request.LocationID, cookie),
 		NewWatchReporter:       c.playbackReporter(request.VideoID, request.LocationID, cookie, request.Path, request.DirPath),
 		DataDir:                dataDir,
 		VideoID:                request.VideoID,

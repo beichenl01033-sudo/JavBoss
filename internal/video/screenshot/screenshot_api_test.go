@@ -39,3 +39,21 @@ func TestGetThumbnailReportsUnavailableTimestamp(t *testing.T) {
 		}
 	}
 }
+
+func TestCachedThumbnailPathDoesNotRequireQueueOrMountedVideo(t *testing.T) {
+	root := t.TempDir()
+	video := &models.Video{ID: 99, DurationSec: 300, Path: "/unmounted/network.mp4"}
+	if _, ok := screenshot.CachedThumbnailPath(root, video); ok {
+		t.Fatal("missing cache reported present")
+	}
+	path := filepath.Join(root, "video", "99", "screenshot", "128.jpg")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("cached"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := screenshot.CachedThumbnailPath(root, video); !ok || got != path {
+		t.Fatalf("cache=%s %t", got, ok)
+	}
+}

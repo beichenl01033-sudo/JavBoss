@@ -30,6 +30,7 @@ const (
 )
 
 type PlayOptions struct {
+	Cover                   PlaylistCoverResolver
 	NewWatchReporter        func() *playback.Reporter
 	DataDir                 string
 	VideoID                 int64
@@ -46,6 +47,7 @@ type PlaylistItem struct {
 	Title     string
 	Options   PlayOptions
 	Highlight *PlaylistHighlight
+	Cover     PlaylistCoverResolver
 	// OnStarted runs once per successful playback of this entry, including replays.
 	OnStarted func()
 }
@@ -97,8 +99,8 @@ var (
 
 // PlayVideo launches mpv to play the given file path.
 func PlayVideo(path string, options PlayOptions) error {
-	if options.NewWatchReporter != nil {
-		return PlayPlaylist([]PlaylistItem{{Path: path, Options: options}})
+	if options.NewWatchReporter != nil || options.Cover != nil {
+		return PlayPlaylist([]PlaylistItem{{Path: path, Options: options, Cover: options.Cover}})
 	}
 	cancelFocusRestoreAttempts()
 	rememberFocusRestoreOwner(0)
@@ -348,6 +350,10 @@ func (s *playerSession) stopLocked() {
 }
 
 func (s *playerSession) playVideoLocked(path string, options PlayOptions) error {
+	s.events.setPlaylistCovers(nil)
+	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-visuals", map[string]any{}}); err != nil {
+		return err
+	}
 	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/highlight-playback", map[string]any{"enabled": false}}); err != nil {
 		return err
 	}
@@ -394,6 +400,10 @@ func (s *playerSession) playVideoLocked(path string, options PlayOptions) error 
 func (s *playerSession) playPlaylistLocked(items []PlaylistItem, startIndex int) error {
 	if startIndex < 0 || startIndex >= len(items) {
 		return errors.New("playlist start index is out of range")
+	}
+	s.events.setPlaylistCovers(nil)
+	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-visuals", map[string]any{}}); err != nil {
+		return err
 	}
 	commands, err := buildBeforeLoadCommands(items[0].Options)
 	if err != nil {
@@ -447,6 +457,8 @@ func (s *playerSession) playPlaylistLocked(items []PlaylistItem, startIndex int)
 	reporters := make(map[int64]func() *playback.Reporter, len(items))
 	titles := make(map[string]string, len(items))
 	points := make(map[string]*PlaylistHighlight)
+	visuals := make(map[string]playlistVisual, len(items))
+	sources := make(map[string]PlaylistCoverResolver)
 	for index, entry := range entries {
 		callbacks[entry.ID] = items[index].OnStarted
 		reporters[entry.ID] = items[index].Options.NewWatchReporter
@@ -456,10 +468,27 @@ func (s *playerSession) playPlaylistLocked(items []PlaylistItem, startIndex int)
 		if items[index].Highlight != nil {
 			points[strconv.FormatInt(entry.ID, 10)] = items[index].Highlight
 		}
+		item := items[index]
+		key := playlistVisualKey(item)
+		title := item.Title
+		if item.Highlight != nil {
+			title = item.Highlight.VideoTitle
+		}
+		if strings.TrimSpace(title) == "" {
+			title = filepath.Base(item.Path)
+		}
+		visuals[strconv.FormatInt(entry.ID, 10)] = playlistVisual{Key: key, VideoID: item.Options.VideoID, Title: title}
+		sources[key] = item.Cover
 	}
 	s.events.setCallbacks(callbacks)
 	s.events.setWatchReporters(reporters)
 	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-titles", titles}); err != nil {
+		return err
+	}
+	covers := newPlaylistCovers(s.ipcPath, sources)
+	s.events.setPlaylistCovers(covers)
+	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-visuals", map[string]any{"generation": covers.generation, "entries": visuals}}); err != nil {
+		s.events.setPlaylistCovers(nil)
 		return err
 	}
 	if err := runIPCCommand(s.ipcPath, []any{"set_property", "user-data/javboss/playlist-highlights", points}); err != nil {

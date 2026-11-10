@@ -1,8 +1,10 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -81,6 +83,7 @@ func (c *Client) handlePlaylist(w http.ResponseWriter, r *http.Request) {
 		items = append(items, mpv.PlaylistItem{
 			Path:  c.localBaseURL + "/__client/media/" + token,
 			Title: title,
+			Cover: c.playlistCoverResolver(remote, item.VideoID, item.LocationID, cookie),
 			OnStarted: func() {
 				if c.remoteState() == remote {
 					c.incrementRemotePlayCount(videoID, cookie)
@@ -105,4 +108,41 @@ func (c *Client) handlePlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "count": len(items)})
+}
+
+func (c *Client) playlistCoverResolver(remote *remoteState, videoID, locationID int64, cookie string) mpv.PlaylistCoverResolver {
+	return func(ctx context.Context) (mpv.PlaylistCoverSource, error) {
+		if remote == nil || c.remoteState() != remote {
+			return mpv.PlaylistCoverSource{}, errors.New("remote server changed")
+		}
+		target := *remote.base
+		target.Path = "/videos/" + strconv.FormatInt(videoID, 10) + "/playlist-cover"
+		query := url.Values{}
+		if locationID > 0 {
+			query.Set("location_id", strconv.FormatInt(locationID, 10))
+		}
+		target.RawQuery = query.Encode()
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+		if err != nil {
+			return mpv.PlaylistCoverSource{}, err
+		}
+		request.Header.Set("Cookie", cookie)
+		// Bind credentials to the original remote; never follow a redirect or a
+		// concurrent server switch. Lua/MPV only receive the decoded local bitmap.
+		response, err := c.transport.RoundTrip(request)
+		if err != nil {
+			return mpv.PlaylistCoverSource{}, err
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			return mpv.PlaylistCoverSource{}, errors.New("cached remote cover unavailable")
+		}
+		data, err := io.ReadAll(io.LimitReader(response.Body, (20<<20)+1))
+		if err != nil || len(data) > 20<<20 || c.remoteState() != remote {
+			return mpv.PlaylistCoverSource{}, errors.New("invalid remote cover response")
+		}
+		aspect, _ := strconv.ParseFloat(response.Header.Get("X-JavBoss-Cover-Aspect"), 64)
+		position, _ := strconv.ParseFloat(response.Header.Get("X-JavBoss-Cover-Position"), 64)
+		return mpv.PlaylistCoverSource{Data: data, CropAspect: aspect, CropPosition: position}, nil
+	}
 }

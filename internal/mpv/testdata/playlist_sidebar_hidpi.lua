@@ -21,6 +21,8 @@ local function harness(scale, width, height, position)
         bindings = {},
         timers = {},
         commands = {},
+        messages = {},
+        bitmaps = {},
     }
     for i = 1, 40 do
         state.properties.playlist[i] = {id = i, title = "entry-" .. i}
@@ -42,6 +44,7 @@ local function harness(scale, width, height, position)
         get_property_number = property,
         get_property_native = property,
         set_property_number = function(name, value) state.properties[name] = value end,
+        set_property_native = function(name, value) state.properties[name] = value end,
         create_osd_overlay = function() return overlay end,
         get_osd_size = function() return state.width, state.height end,
         get_mouse_pos = function() return state.mouse_x, state.mouse_y end,
@@ -54,8 +57,9 @@ local function harness(scale, width, height, position)
         observe_property = function(name, _, callback) state.observers[name] = callback end,
         add_timeout = function(_, callback) state.timers[#state.timers + 1] = callback end,
         commandv = function(...) state.commands[#state.commands + 1] = {...} end,
+        command_native = function(command) state.bitmaps[#state.bitmaps+1] = command; return true end,
         add_hook = function() end,
-        register_script_message = function() end,
+        register_script_message = function(name, callback) state.messages[name] = callback end,
         register_event = function() end,
     }
     package.loaded["mp.options"] = {read_options = function() end}
@@ -183,6 +187,62 @@ local function run_tests()
     closable:click(980, 29)
     assert(not closable.overlay.visible and not closable.enabled, "header close button did not collapse the sidebar")
     near(closable.properties["user-data/javboss/playlist-sidebar-width"], 0)
+
+    for _, scale in ipairs({1, 1.25, 2}) do
+        local grouped = harness(scale)
+        grouped.properties.playlist = {{id=101, filename="a"}, {id=102, filename="a"}, {id=103, filename="b"}}
+        grouped.properties["user-data/javboss/playlist-highlights"] = {
+            ["101"]={video_id=1, video_title="Video A", time=0, label="First"},
+            ["102"]={video_id=1, video_title="Video A", time=12, label="Second"},
+            ["103"]={video_id=2, video_title="Video B", time=30, label="Third"},
+        }
+        grouped:change("user-data/javboss/playlist-visuals", {generation="test", entries={
+            ["101"]={key="a", title="Video A"}, ["102"]={key="a", title="Video A"}, ["103"]={key="b", title="Video B"},
+        }})
+        local _, title_count = grouped.overlay.data:gsub("Video A", "")
+        assert(title_count == 1, "repeated the video cover/title for every highlight")
+        local request = grouped.properties["user-data/javboss/playlist-cover-request"]
+        assert(#request.keys == 2 and request.keys[1] == "a" and request.keys[2] == "b", "did not share artwork between highlights")
+        grouped:click(900, 170)
+        assert(grouped.commands[#grouped.commands][1] == "playlist-play-index" and grouped.commands[#grouped.commands][2] == 1, "second highlight played the first one")
+        local command_count = #grouped.commands
+        grouped:click(975, 90)
+        assert(#grouped.commands == command_count, "folding a group started playback")
+        assert(not grouped.overlay.data:find("Second", 1, true), "group did not fold")
+        grouped:change("playlist-pos", 1)
+        assert(not grouped.overlay.data:find("Second", 1, true), "advancing a point reopened a manually folded video")
+        grouped:click(900, 202)
+        assert(grouped.commands[#grouped.commands][2] == 2, "folded groups broke native indices")
+        grouped:click(730, 90)
+        assert(grouped.commands[#grouped.commands][2] == 0 and grouped.overlay.data:find("Second", 1, true), "cover click did not open/play the first highlight")
+        grouped.messages["covers-ready"]("stale", real_utils.format_json({a={path="cover.bgra",width=128,height=128}}))
+        grouped:flush()
+        assert(#grouped.bitmaps == 0, "accepted artwork from an old playlist")
+        grouped.messages["covers-ready"]("test", real_utils.format_json({a={path="cover.bgra",width=128,height=128}, b=false}))
+        grouped:flush()
+        assert(#grouped.bitmaps == 1, "cover repeated for each highlight")
+        local bitmap = grouped.bitmaps[1]
+        near(bitmap.x, math.floor(698*scale+0.5))
+        near(bitmap.y, math.floor(66*scale+0.5))
+        near(bitmap.dw, math.floor(48*scale+0.5))
+        assert(bitmap.id ~= 42, "reused timeline thumbnail bitmap ID")
+        grouped.messages["thumbfast-info"](real_utils.format_json({overlay_id=0}))
+        grouped:flush()
+        assert(grouped.bitmaps[#grouped.bitmaps].id ~= 0, "ignored thumbfast's custom bitmap ID")
+        grouped:click(980, 29)
+        assert(not grouped.overlay.visible, "closing left artwork visible")
+        assert(grouped.commands[#grouped.commands][4] == "auto", "closing hid bottom controls")
+    end
+
+    local normal = harness(1)
+    local entries = {}
+    for i=1,40 do entries[tostring(i)]={key="video-"..i, title="Movie "..i} end
+    normal:change("user-data/javboss/playlist-visuals", {generation="normal",entries=entries})
+    assert(#normal.properties["user-data/javboss/playlist-cover-request"].keys == 6, "requested artwork outside the viewport")
+    normal.bindings.wheel_down[2]()
+    normal:flush()
+    normal:click(900, 90)
+    assert(normal.commands[#normal.commands][2] == 3, "normal cover rows lost scroll position")
 end
 
 local ok, err = pcall(run_tests)
