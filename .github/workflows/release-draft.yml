@@ -28,7 +28,7 @@ jobs:
           - windows-x86_64
           - macos-arm64
     # Cross-build Apple Silicon on Intel hosts to avoid ARM runner capacity shortages.
-    runs-on: ${{ fromJson('{"windows-x86_64":"ubuntu-latest","macos-arm64":"macos-15-intel"}')[matrix.platform] }}
+    runs-on: ${{ fromJson('{"windows-x86_64":"ubuntu-24.04","macos-arm64":"macos-15-intel"}')[matrix.platform] }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -47,9 +47,10 @@ jobs:
 
       - name: Install build deps (Windows target)
         if: ${{ matrix.platform == 'windows-x86_64' }}
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mingw-w64 zip unzip
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends gcc-mingw-w64-x86-64-posix zip unzip
 
       - name: Build CLI bundle
         run: |
@@ -66,6 +67,37 @@ jobs:
       - name: Verify Apple Silicon binary
         if: ${{ matrix.platform == 'macos-arm64' }}
         run: test "$(lipo -archs "release/javboss-${RELEASE}-macos-arm64/javboss")" = arm64
+
+      - name: Verify complete release archive
+        env:
+          BUILD_PLATFORM: ${{ matrix.platform }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          const platform = process.env.BUILD_PLATFORM;
+          const archive = `release/javboss-${process.env.RELEASE}-${platform}.zip`;
+          execFileSync('unzip', ['-tq', archive], { stdio: 'inherit' });
+          const entries = execFileSync('unzip', ['-Z1', archive], { encoding: 'utf8' }).trim().split('\n');
+          const common = ['config.toml', 'web/dist/index.html', 'modernz/modernz.lua', 'modernz/playlist_sidebar.lua', 'modernz/playlist_sidebar.conf', 'modernz/javboss_highlight_sidebar.lua', 'modernz/javboss_control.lua', 'modernz/window_geometry.lua'];
+          const binaries = platform === 'windows-x86_64'
+            ? ['javboss.exe', 'internal/bin/ffprobe.exe', 'internal/bin/mpv/mpv.exe']
+            : ['javboss', 'javboss.command', 'internal/bin/ffprobe', 'internal/bin/ffmpeg', 'internal/bin/mpv/mpv.app/Contents/MacOS/mpv'];
+          for (const name of [...common, ...binaries]) assert(entries.includes(`JavBoss/${name}`), `Missing runtime file: ${name}`);
+          assert(entries.some(name => /^JavBoss\/web\/dist\/assets\/.+\.js$/.test(name)), 'Missing frontend bundle');
+          assert(!entries.some(name => name.startsWith('JavBoss/data/')), 'Archive must not contain user data');
+          for (const name of common.filter(name => name.startsWith('modernz/'))) {
+            const bundled = execFileSync('unzip', ['-p', archive, `JavBoss/${name}`], { maxBuffer: 4 * 1024 * 1024 });
+            assert(bundled.equals(readFileSync(name)), `Player asset differs from source: ${name}`);
+          }
+          if (platform === 'windows-x86_64') {
+            const description = execFileSync('file', [`release/javboss-${process.env.RELEASE}-${platform}/javboss.exe`], { encoding: 'utf8' });
+            assert.match(description, /PE32\+.*x86-64/, 'Expected Windows x86_64 executable');
+            console.log(description.trim());
+          }
+          console.log(`Verified ${platform}: ZIP integrity, complete runtime, frontend and exact player scripts`);
+          JS
 
       - name: Upload release asset
         uses: actions/upload-artifact@v6
