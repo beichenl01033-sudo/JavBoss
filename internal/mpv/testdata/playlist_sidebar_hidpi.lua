@@ -7,7 +7,7 @@ local function near(actual, expected)
     assert(math.abs(actual - expected) < 0.001, string.format("got %s, expected %s", actual, expected))
 end
 
-local function harness(scale, width, height, position)
+local function harness(scale, width, height, position, overrides)
     local state = {
         width = width or 1000 * scale,
         height = height or 600 * scale,
@@ -23,6 +23,7 @@ local function harness(scale, width, height, position)
         commands = {},
         messages = {},
         bitmaps = {},
+        active_bitmaps = {},
     }
     for i = 1, 40 do
         state.properties.playlist[i] = {id = i, title = "entry-" .. i}
@@ -56,13 +57,23 @@ local function harness(scale, width, height, position)
         end,
         observe_property = function(name, _, callback) state.observers[name] = callback end,
         add_timeout = function(_, callback) state.timers[#state.timers + 1] = callback end,
-        commandv = function(...) state.commands[#state.commands + 1] = {...} end,
-        command_native = function(command) state.bitmaps[#state.bitmaps+1] = command; return true end,
+        commandv = function(...)
+            local command = {...}
+            state.commands[#state.commands + 1] = command
+            if command[1] == "overlay-remove" then state.active_bitmaps[command[2]] = nil end
+        end,
+        command_native = function(command)
+            state.bitmaps[#state.bitmaps+1] = command
+            state.active_bitmaps[command.id] = command
+            return true
+        end,
         add_hook = function() end,
         register_script_message = function(name, callback) state.messages[name] = callback end,
         register_event = function() end,
     }
-    package.loaded["mp.options"] = {read_options = function() end}
+    package.loaded["mp.options"] = {read_options = function(options)
+        for key, value in pairs(overrides or {}) do options[key] = value end
+    end}
     package.loaded["mp.utils"] = real_utils
     dofile(sidebar_path)
     package.loaded["mp"] = real_mp
@@ -189,7 +200,7 @@ local function run_tests()
     near(closable.properties["user-data/javboss/playlist-sidebar-width"], 0)
 
     for _, scale in ipairs({1, 1.25, 2}) do
-        local grouped = harness(scale)
+        local grouped = harness(scale, nil, nil, nil, {cover_preview=false})
         grouped.properties.playlist = {{id=101, filename="a"}, {id=102, filename="a"}, {id=103, filename="b"}}
         grouped.properties["user-data/javboss/playlist-highlights"] = {
             ["101"]={video_id=1, video_title="Video A", time=0, label="First"},
@@ -234,7 +245,7 @@ local function run_tests()
         assert(grouped.commands[#grouped.commands][4] == "auto", "closing hid bottom controls")
     end
 
-    local normal = harness(1)
+    local normal = harness(1, nil, nil, nil, {cover_preview=false})
     local entries = {}
     for i=1,40 do entries[tostring(i)]={key="video-"..i, title="Movie "..i} end
     normal:change("user-data/javboss/playlist-visuals", {generation="normal",entries=entries})
@@ -243,6 +254,94 @@ local function run_tests()
     normal:flush()
     normal:click(900, 90)
     assert(normal.commands[#normal.commands][2] == 3, "normal cover rows lost scroll position")
+
+    for _, scale in ipairs({1, 1.25, 2}) do
+        local preview = harness(scale)
+        preview:change("user-data/javboss/playlist-visuals", {generation="preview", entries=entries})
+        assert(preview.properties["user-data/javboss/playlist-preview-visible"] == true)
+        near(preview.properties["user-data/javboss/playlist-sidebar-width"], 560*scale)
+        near(preview.properties["video-margin-ratio-right"], 0)
+        assert(preview.overlay.data:find("Movie 6", 1, true) and not preview.overlay.data:find("Movie 7", 1, true), "large preview consumed list rows")
+        preview:mouse(600, 150)
+        preview.bindings.mouse_move[2]()
+        preview:flush()
+        near(preview.properties["user-data/javboss/playlist-preview-index"], 1)
+        assert(#preview.commands == 0, "hover started playback")
+        local request = preview.properties["user-data/javboss/playlist-cover-request"]
+        assert(request.keys[1] == "video-2", "preview was not prioritized")
+        preview:mouse(900, 180)
+        preview.bindings.mouse_move[2]()
+        preview:flush()
+        near(preview.properties["user-data/javboss/playlist-preview-index"], 1)
+        preview:click(900, 180)
+        assert(#preview.commands == 0, "clicking the preview started playback")
+        preview.messages["covers-ready"]("preview", real_utils.format_json({["video-2"]={path="poster.bgra",width=256,height=512}}))
+        preview:flush()
+        local large, mini
+        for _, bitmap in pairs(preview.active_bitmaps) do
+            if bitmap.dw > 48*scale then large = bitmap else mini = bitmap end
+        end
+        assert(large and mini, "large preview and thumbnail did not share artwork")
+        near(large.dw, math.floor(144*scale+0.5))
+        near(large.dh, math.floor(288*scale+0.5))
+        near(mini.dw, math.floor(24*scale+0.5))
+        near(mini.dh, math.floor(48*scale+0.5))
+        assert(large.id ~= mini.id and large.id ~= 42 and mini.id ~= 42)
+        preview:change("playlist-pos", 2)
+        near(preview.properties["user-data/javboss/playlist-preview-index"], 2)
+        preview:mouse(600, 150)
+        preview.bindings.mouse_move[2]()
+        preview:flush()
+        preview.bindings.mouse_leave[2]()
+        preview:flush()
+        near(preview.properties["user-data/javboss/playlist-preview-index"], 2)
+        preview:click(933, 29)
+        assert(preview.properties["user-data/javboss/playlist-preview-visible"] == false)
+        near(preview.properties["user-data/javboss/playlist-sidebar-width"], 320*scale)
+        assert(preview.overlay.data:find("Movie 6", 1, true), "closing preview changed list density")
+        preview:click(900, 150)
+        assert(preview.commands[#preview.commands][1] == "playlist-play-index" and preview.commands[#preview.commands][2] == 1, "closing preview broke row hit testing")
+        preview:click(933, 29)
+        assert(preview.properties["user-data/javboss/playlist-preview-visible"] == true)
+        near(preview.properties["video-margin-ratio-right"], 0)
+        preview:change("fullscreen", true)
+        assert(not preview.overlay.visible and next(preview.active_bitmaps) == nil, "fullscreen retained a preview bitmap")
+    end
+
+    local narrow = harness(1, 640, 600)
+    narrow:change("user-data/javboss/playlist-visuals", {generation="narrow", entries=entries})
+    assert(not narrow.properties["user-data/javboss/playlist-preview-visible"], "preview squeezed a narrow list")
+    near(narrow.properties["user-data/javboss/playlist-sidebar-width"], 320)
+    narrow.width = 1000
+    narrow:change("osd-dimensions", {})
+    assert(narrow.properties["user-data/javboss/playlist-preview-visible"], "wider window did not restore preview")
+    narrow.height = 300
+    narrow:change("osd-dimensions", {})
+    assert(not narrow.properties["user-data/javboss/playlist-preview-visible"], "preview overflowed a short window")
+
+    local points = harness(1)
+    points.properties.playlist = {{id=101,filename="a"},{id=102,filename="a"},{id=103,filename="b"}}
+    points.properties["user-data/javboss/playlist-highlights"] = {
+        ["101"]={video_id=1,video_title="Video A",time=0,label="First"},
+        ["102"]={video_id=1,video_title="Video A",time=12,label="Second"},
+        ["103"]={video_id=2,video_title="Video B",time=30,label="Third"},
+    }
+    points:change("user-data/javboss/playlist-visuals", {generation="points",entries={
+        ["101"]={key="a",title="Video A"},["102"]={key="a",title="Video A"},["103"]={key="b",title="Video B"},
+    }})
+    points:mouse(600, 170)
+    points.bindings.mouse_move[2]()
+    points:flush()
+    near(points.properties["user-data/javboss/playlist-preview-index"], 1)
+    assert(points.properties["user-data/javboss/playlist-cover-request"].keys[1] == "a", "highlight did not preview its own video")
+    points:click(600, 170)
+    assert(points.commands[#points.commands][2] == 1, "preview broke highlight selection")
+    local count = #points.commands
+    points:click(735, 90)
+    assert(#points.commands == count and not points.overlay.data:find("Second", 1, true), "preview broke group folding")
+    points:click(933, 29)
+    points:click(900, 170)
+    assert(points.commands[#points.commands][2] == 2, "folded preview groups lost native indices")
 end
 
 local ok, err = pcall(run_tests)

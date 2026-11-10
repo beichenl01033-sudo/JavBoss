@@ -48,23 +48,23 @@ func TestPlaylistCoverPixelsPreserveAspectCropAndBGRA(t *testing.T) {
 		{"poster right", PlaylistCoverSource{CropAspect: 0.5, CropPosition: 1}, 255, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pixels, err := playlistCoverPixels(data, tc.source)
+			pixels, width, height, err := playlistCoverPixels(data, tc.source)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(pixels) != playlistCoverSize*playlistCoverSize*4 {
+			if width != 40 || height != 80 || len(pixels) != width*height*4 {
 				t.Fatal("incorrect bitmap size")
 			}
-			center := (64*playlistCoverSize + 64) * 4
+			center := ((height/2)*width + width/2) * 4
 			if pixels[center] != tc.blue || pixels[center+2] != tc.red || pixels[center+3] != 255 {
 				t.Fatalf("incorrect BGRA crop: %v", pixels[center:center+4])
 			}
-			if pixels[(64*playlistCoverSize)*4+3] != 0 {
-				t.Fatal("poster was stretched instead of letterboxed")
+			if pixels[3] != 255 {
+				t.Fatal("poster contains padding instead of preserving its natural dimensions")
 			}
 		})
 	}
-	_, err := playlistCoverPixels([]byte("not an image"), PlaylistCoverSource{})
+	_, _, _, err := playlistCoverPixels([]byte("not an image"), PlaylistCoverSource{})
 	if err == nil {
 		t.Fatal("invalid image accepted")
 	}
@@ -72,8 +72,25 @@ func TestPlaylistCoverPixelsPreserveAspectCropAndBGRA(t *testing.T) {
 	binary.BigEndian.PutUint32(huge[16:20], 9000)
 	binary.BigEndian.PutUint32(huge[20:24], 9000)
 	binary.BigEndian.PutUint32(huge[29:33], crc32.ChecksumIEEE(huge[12:29]))
-	if _, err := playlistCoverPixels(huge, PlaylistCoverSource{}); err == nil {
+	if _, _, _, err := playlistCoverPixels(huge, PlaylistCoverSource{}); err == nil {
 		t.Fatal("oversized dimensions accepted")
+	}
+}
+
+func TestPlaylistCoverPixelsBoundResolutionWithoutUpscaling(t *testing.T) {
+	for _, tc := range []struct{ width, height, wantWidth, wantHeight int }{
+		{1024, 1536, 341, 512},
+		{1024, 512, 512, 256},
+		{120, 80, 120, 80},
+	} {
+		var data bytes.Buffer
+		if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, tc.width, tc.height))); err != nil {
+			t.Fatal(err)
+		}
+		pixels, width, height, err := playlistCoverPixels(data.Bytes(), PlaylistCoverSource{})
+		if err != nil || width != tc.wantWidth || height != tc.wantHeight || len(pixels) != width*height*4 {
+			t.Fatalf("%dx%d produced %dx%d: %v", tc.width, tc.height, width, height, err)
+		}
 	}
 }
 
@@ -137,10 +154,10 @@ func TestPlaylistCoversLazyDeduplicationAndCleanup(t *testing.T) {
 	if first.Path == "" || first.Path != second.Path {
 		t.Fatal("identical image decoded more than once")
 	}
-	if first.Width != playlistCoverSize || first.Height != playlistCoverSize {
+	if first.Width != 120 || first.Height != 80 {
 		t.Fatal("invalid image dimensions")
 	}
-	if info, err := os.Stat(first.Path); err != nil || info.Size() != playlistCoverSize*playlistCoverSize*4 {
+	if info, err := os.Stat(first.Path); err != nil || info.Size() != int64(first.Width*first.Height*4) {
 		t.Fatalf("invalid bitmap file: %v", err)
 	}
 	request(c.generation, 2, "a")

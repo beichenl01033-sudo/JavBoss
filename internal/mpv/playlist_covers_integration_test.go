@@ -3,10 +3,13 @@
 package mpv
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +17,41 @@ import (
 	"testing"
 	"time"
 )
+
+// Synthetic posters make layout screenshots reviewable without user media.
+func previewPosterFixture(t *testing.T, alternate bool) []byte {
+	t.Helper()
+	poster := image.NewRGBA(image.Rect(0, 0, 320, 480))
+	for y := 0; y < 480; y++ {
+		for x := 0; x < 320; x++ {
+			c := color.RGBA{R: uint8(25 + y/12), G: uint8(65 + y/8), B: uint8(105 + x/5), A: 255}
+			if alternate {
+				c.R, c.B = c.B, c.R
+			}
+			poster.SetRGBA(x, y, c)
+		}
+	}
+	glyph := []string{"01110", "10001", "10001", "11111", "10001", "10001", "10001"}
+	if alternate {
+		glyph = []string{"11110", "10001", "10001", "11110", "10001", "10001", "11110"}
+	}
+	for row, line := range glyph {
+		for column, bit := range line {
+			if bit == '1' {
+				for y := 100 + row*34; y < 100+(row+1)*34; y++ {
+					for x := 75 + column*34; x < 75+(column+1)*34; x++ {
+						poster.SetRGBA(x, y, color.RGBA{R: 225, G: 235, B: 245, A: 255})
+					}
+				}
+			}
+		}
+	}
+	var data bytes.Buffer
+	if err := png.Encode(&data, poster); err != nil {
+		t.Fatal(err)
+	}
+	return data.Bytes()
+}
 
 func TestPlaylistCoversWithMPV(t *testing.T) {
 	executable := os.Getenv("JAVBOSS_TEST_MPV")
@@ -66,17 +104,23 @@ func TestPlaylistCoversWithMPV(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = file.Close()
-	data := coverFixture(t)
+	firstData, secondData := previewPosterFixture(t, false), previewPosterFixture(t, true)
 	var firstLoads, secondLoads atomic.Int64
-	items := []PlaylistItem{
-		{Path: media, Title: "Video A", Options: PlayOptions{VideoID: 1}, Cover: func(context.Context) (PlaylistCoverSource, error) {
-			firstLoads.Add(1)
+	items := make([]PlaylistItem, 12)
+	for index := range items {
+		id := int64(index + 1)
+		items[index] = PlaylistItem{Path: media, Title: fmt.Sprintf("Demo video %02d", id), Options: PlayOptions{VideoID: id}, Cover: func(context.Context) (PlaylistCoverSource, error) {
+			data := firstData
+			if id%2 == 0 {
+				data = secondData
+			}
+			if id == 1 {
+				firstLoads.Add(1)
+			} else if id == 2 {
+				secondLoads.Add(1)
+			}
 			return PlaylistCoverSource{Data: data}, nil
-		}},
-		{Path: media, Title: "Video B", Options: PlayOptions{VideoID: 2}, Cover: func(context.Context) (PlaylistCoverSource, error) {
-			secondLoads.Add(1)
-			return PlaylistCoverSource{Data: data}, nil
-		}},
+		}}
 	}
 	session := &playerSession{}
 	t.Cleanup(session.Reset)
@@ -111,7 +155,43 @@ func TestPlaylistCoversWithMPV(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	if gui != "" {
-		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-cover-count", float64(2))
+		waitMPVTestProperty(t, endpoint, "playlist-count", float64(len(items)))
+		dpi := readMPVTestProperty(t, endpoint, "display-hidpi-scale").(float64)
+		logicalHeight := readMPVTestProperty(t, endpoint, "osd-height").(float64) / dpi
+		visibleCovers := math.Floor((logicalHeight - 96 - 34 - 58) / 64)
+		if visibleCovers < 6 || visibleCovers >= float64(len(items)) {
+			t.Fatalf("unexpected visible list density: %v", visibleCovers)
+		}
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-cover-count", visibleCovers+1)
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-preview-index", float64(0))
+		originalWidth := readMPVTestProperty(t, endpoint, "osd-width")
+		originalHeight := readMPVTestProperty(t, endpoint, "osd-height")
+		if err := runIPCCommand(endpoint, []any{"script-message-to", "playlist_sidebar", "toggle-cover-preview"}); err != nil {
+			t.Fatal(err)
+		}
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-cover-count", visibleCovers)
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-preview-visible", false)
+		waitMPVTestProperty(t, endpoint, "user-data/osc/visibility", "always")
+		if err := runIPCCommand(endpoint, []any{"script-message-to", "playlist_sidebar", "toggle-cover-preview"}); err != nil {
+			t.Fatal(err)
+		}
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-cover-count", visibleCovers+1)
+		waitMPVTestProperty(t, endpoint, "user-data/osc/visibility", "always")
+		if readMPVTestProperty(t, endpoint, "osd-width") != originalWidth || readMPVTestProperty(t, endpoint, "osd-height") != originalHeight {
+			t.Fatal("cover preview resized the player")
+		}
+		if readMPVTestProperty(t, endpoint, "video-margin-ratio-right") != float64(0) {
+			t.Fatal("cover preview resized the video")
+		}
+		// Use MPV's own mouse command so actual Lua input routing is covered,
+		// without moving the user's system pointer or clicking their windows.
+		mouseX := originalWidth.(float64) - (240+100)*dpi
+		mouseY := (58 + 64 + 20) * dpi
+		if err := runIPCCommand(endpoint, []any{"mouse", mouseX, mouseY}); err != nil {
+			t.Fatal(err)
+		}
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-preview-index", float64(1))
+		waitMPVTestProperty(t, endpoint, "playlist-pos", float64(0))
 		if screenshot := os.Getenv("JAVBOSS_COVER_PREVIEW_PATH"); screenshot != "" {
 			_ = runIPCCommand(endpoint, []any{"show-text", "", 0})
 			time.Sleep(200 * time.Millisecond)
@@ -139,7 +219,8 @@ func TestPlaylistCoversWithMPV(t *testing.T) {
 	waitMPVTestProperty(t, endpoint, "playlist-count", float64(3))
 	waitMPVTestProperty(t, endpoint, "playlist-pos", float64(1))
 	if gui != "" {
-		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-cover-count", float64(2))
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-cover-count", float64(3))
+		waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-preview-index", float64(1))
 		if firstLoads.Load() != 2 || secondLoads.Load() != 2 {
 			t.Fatal("highlight entries requested duplicate covers")
 		}

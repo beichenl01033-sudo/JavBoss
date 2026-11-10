@@ -24,7 +24,7 @@ import (
 )
 
 const playlistCoverRequestProperty = "user-data/javboss/playlist-cover-request"
-const playlistCoverSize = 128
+const playlistCoverSize = 512
 const maxPlaylistCoverBytes = 20 << 20
 
 // PlaylistCoverSource contains cached artwork, never a video to extract frames from.
@@ -179,7 +179,7 @@ func loadPlaylistCover(ctx context.Context, resolve PlaylistCoverResolver, direc
 	if cached, ok := decoded[identity]; ok {
 		return cached
 	}
-	pixels, err := playlistCoverPixels(data, source)
+	pixels, width, height, err := playlistCoverPixels(data, source)
 	if err != nil || ctx.Err() != nil {
 		return false
 	}
@@ -194,7 +194,7 @@ func loadPlaylistCover(ctx context.Context, resolve PlaylistCoverResolver, direc
 	if err := os.WriteFile(path, pixels, 0600); err != nil {
 		return false
 	}
-	result := playlistCoverImage{Path: path, Width: playlistCoverSize, Height: playlistCoverSize}
+	result := playlistCoverImage{Path: path, Width: width, Height: height}
 	decoded[identity] = result
 	return result
 }
@@ -222,14 +222,14 @@ func readPlaylistCover(source PlaylistCoverSource) ([]byte, error) {
 	return data, err
 }
 
-func playlistCoverPixels(data []byte, source PlaylistCoverSource) ([]byte, error) {
+func playlistCoverPixels(data []byte, source PlaylistCoverSource) ([]byte, int, int, error) {
 	config, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil || config.Width <= 0 || config.Height <= 0 || int64(config.Width)*int64(config.Height) > 16_000_000 {
-		return nil, fmt.Errorf("invalid playlist cover dimensions")
+		return nil, 0, 0, fmt.Errorf("invalid playlist cover dimensions")
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 	bounds := img.Bounds()
 	if aspect := source.CropAspect; aspect > 0 && !math.IsNaN(aspect) && !math.IsInf(aspect, 0) {
@@ -244,13 +244,14 @@ func playlistCoverPixels(data []byte, source PlaylistCoverSource) ([]byte, error
 		top := bounds.Min.Y + (bounds.Dy()-height)/2
 		bounds = image.Rect(left, top, left+width, top+height)
 	}
-	scale := min(float64(playlistCoverSize)/float64(bounds.Dx()), float64(playlistCoverSize)/float64(bounds.Dy()))
+	scale := min(1, float64(playlistCoverSize)/float64(bounds.Dx()), float64(playlistCoverSize)/float64(bounds.Dy()))
 	width, height := max(1, int(math.Round(float64(bounds.Dx())*scale))), max(1, int(math.Round(float64(bounds.Dy())*scale)))
-	left, top := (playlistCoverSize-width)/2, (playlistCoverSize-height)/2
-	canvas := image.NewRGBA(image.Rect(0, 0, playlistCoverSize, playlistCoverSize))
-	draw.CatmullRom.Scale(canvas, image.Rect(left, top, left+width, top+height), img, bounds, draw.Src, nil)
+	// Keep the cropped image's natural aspect ratio. Lua can fit this same bitmap
+	// into both a tiny list slot and the independent, larger preview pane.
+	canvas := image.NewRGBA(image.Rect(0, 0, width, height))
+	draw.CatmullRom.Scale(canvas, canvas.Bounds(), img, bounds, draw.Src, nil)
 	for index := 0; index < len(canvas.Pix); index += 4 {
 		canvas.Pix[index], canvas.Pix[index+2] = canvas.Pix[index+2], canvas.Pix[index]
 	}
-	return canvas.Pix, nil
+	return canvas.Pix, width, height, nil
 }
