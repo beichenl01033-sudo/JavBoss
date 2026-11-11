@@ -25,6 +25,8 @@ jobs:
       CC: gcc
       GOCACHE: ${{ github.workspace }}/.gocache
     steps:
+      - name: Keep source line endings for resource assertions
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
@@ -34,7 +36,7 @@ jobs:
       - name: Verify CGO compiler
         run: gcc --version
       - name: Test native window geometry and docking policy
-        run: go test -count=1 -timeout=3m ./internal/mpv -run 'Test(WindowDock|NativeWindowDock|BundledPlaylistSidebar)'
+        run: go test -v -count=1 -timeout=3m ./internal/mpv -run 'Test(WindowDock|NativeWindowDock|BundledPlaylistSidebar)'
       - name: Build complete server command
         shell: pwsh
         run: go build -o "$env:RUNNER_TEMP/javboss-window-test.exe" ./cmd/server
