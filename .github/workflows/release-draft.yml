@@ -49,13 +49,19 @@ jobs:
         if: ${{ matrix.platform == 'windows-x86_64' }}
         timeout-minutes: 10
         run: |
-          # Bypass the runner's Azure mirror list when its DNS is unavailable.
-          # Keep Ubuntu's suites, components and signature verification intact.
-          sudo sed -i \
-            -e 's#mirror+file:/etc/apt/apt-mirrors\.txt#https://archive.ubuntu.com/ubuntu#g' \
-            -e 's#mirror+file:/etc/apt/apt-mirrors-security\.txt#https://security.ubuntu.com/ubuntu#g' \
-            -e 's#http://azure\.archive\.ubuntu\.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
-            /etc/apt/sources.list.d/ubuntu.sources
+          # Probe mirrors quickly instead of waiting minutes for APT DNS retries.
+          # Only change URIs; retain suites, components and Ubuntu signing keys.
+          ubuntu_mirror=""
+          for candidate in https://archive.ubuntu.com/ubuntu https://mirrors.edge.kernel.org/ubuntu https://mirrors.mit.edu/ubuntu; do
+            if curl -fsSL --connect-timeout 5 --max-time 10 "$candidate/dists/noble/InRelease" -o /dev/null && \
+               curl -fsSL --connect-timeout 5 --max-time 10 "$candidate/dists/noble-security/InRelease" -o /dev/null; then
+              ubuntu_mirror="$candidate"
+              break
+            fi
+          done
+          test -n "$ubuntu_mirror"
+          echo "Using Ubuntu package mirror: $ubuntu_mirror"
+          sudo sed -i "s#^URIs: .*#URIs: $ubuntu_mirror#" /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o APT::Update::Error-Mode=any update
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends gcc-mingw-w64-x86-64-posix zip unzip
 
