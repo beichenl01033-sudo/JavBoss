@@ -30,6 +30,9 @@ type dockWindowInfo struct {
 	WorkHeight          float64
 	PixelScale          float64
 	Maximized           bool
+	Minimized           bool
+	NativeState         bool
+	GeometryState       bool
 }
 
 type windowDockLayout struct {
@@ -47,11 +50,27 @@ type dockPlan struct {
 	Suspended bool
 }
 
+func dockSuspended(request windowDockRequest, info dockWindowInfo) bool {
+	// Native fullscreen/maximize flags can clear before the restore animation.
+	// Never resize a still-screen-sized rectangle during that transition.
+	fullArea := info.WorkWidth > 0 && info.WorkHeight > 0 && info.Width >= info.WorkWidth-2 && info.Height >= info.WorkHeight-2
+	maximized := request.Maximized
+	if info.NativeState {
+		maximized = info.Maximized
+		if info.GeometryState {
+			// Cocoa can leave mpv's maximized flag set after exiting fullscreen.
+			// Honor it only when the actual rectangle reaches a work-area edge.
+			maximized = request.Maximized && (info.Width >= info.WorkWidth-2 || info.Height >= info.WorkHeight-2)
+		}
+	}
+	return request.Fullscreen || maximized || info.Minimized || fullArea
+}
+
 // Extra is only the width added by us. User moves and manual resizes never
 // restore an old rectangle or recenter the window.
 func planWindowDock(request windowDockRequest, info dockWindowInfo, extra float64) dockPlan {
 	plan := dockPlan{Extra: extra, Layout: windowDockLayout{Serial: request.Serial, ControlsWidth: request.Width, WindowWidth: request.Width}}
-	if request.Fullscreen || request.Maximized || info.Maximized {
+	if dockSuspended(request, info) {
 		plan.Suspended = true
 		return plan
 	}
@@ -66,7 +85,7 @@ func planWindowDock(request windowDockRequest, info dockWindowInfo, extra float6
 	}
 	wanted := request.Preferred / scale
 	frameWidth := info.Width - extra + wanted
-	if wanted <= 0 || info.X < info.WorkX-2 || info.X+frameWidth > info.WorkX+info.WorkWidth-2 {
+	if wanted <= 0 || info.X+frameWidth > info.WorkX+info.WorkWidth-2 {
 		wanted = 0
 	}
 	plan.Extra = wanted
@@ -131,7 +150,7 @@ func (d *windowDock) run() {
 	var resizeAt time.Time
 	var published []byte
 	var processed int64
-	var pendingBase float64
+	var pendingBefore, pendingExtra float64
 	var pendingTarget float64
 	var denied [7]float64
 	var hasDenied bool
@@ -158,33 +177,37 @@ func (d *windowDock) run() {
 		layout := windowDockLayout{Serial: request.Serial, ControlsWidth: request.Width, WindowWidth: request.Width}
 		if info, ok := readDockWindow(pid); ok {
 			// OSD and native geometry notifications can arrive in either order.
-			if math.Abs(info.ClientWidth*info.PixelScale-request.Width) > 3 || math.Abs(info.ClientHeight*info.PixelScale-request.Height) > 3 {
+			if math.Abs(info.ClientWidth*info.PixelScale-request.Width) > 1 || math.Abs(info.ClientHeight*info.PixelScale-request.Height) > 1 {
 				continue
 			}
-			if expectedWidth != 0 && !request.Fullscreen && !request.Maximized && !info.Maximized && math.Abs(info.ClientWidth-pendingTarget)*info.PixelScale > 3 {
+			if expectedWidth != 0 && !dockSuspended(request, info) && math.Abs(info.ClientWidth-pendingTarget)*info.PixelScale > 3 {
 				if time.Since(resizeAt) < time.Second {
 					continue
 				}
-				// The OS refused or clamped a resize. Track only the width that
-				// actually appeared, then fall back instead of growing repeatedly.
-				extra = math.Max(0, info.ClientWidth-pendingBase)
+				// No movement means our resize was refused. A different rectangle
+				// may be a user drag; do not later undo that unexplained new size.
+				extra = pendingExtra
+				if math.Abs(info.ClientWidth-pendingBefore)*info.PixelScale > 3 {
+					extra = 0
+				}
 				denied = [7]float64{request.Preferred, info.X, info.Y, info.WorkX, info.WorkY, info.WorkWidth, info.ClientWidth - extra}
 				hasDenied = true
 			}
 			expectedWidth = 0
-			if ownedGeometry != "" && !request.Fullscreen && !request.Maximized && !info.Maximized {
+			if ownedGeometry != "" && !dockSuspended(request, info) {
 				if releaseDockGeometry(d.endpoint, ownedGeometry, request, info) {
 					ownedGeometry = ""
 				}
 			}
 			key := [7]float64{request.Preferred, info.X, info.Y, info.WorkX, info.WorkY, info.WorkWidth, info.ClientWidth - extra}
-			wanted := request
+			plan := planWindowDock(request, info, extra)
 			if hasDenied && key == denied {
-				wanted.Preferred = 0
+				plan = dockPlan{Extra: extra, Suspended: true, Layout: windowDockLayout{Serial: request.Serial,
+					ControlsWidth: (info.ClientWidth - extra) * info.PixelScale, WindowWidth: request.Width,
+					ExtraWidth: extra * info.PixelScale, Expanded: extra > 0}}
 			} else {
 				hasDenied = false
 			}
-			plan := planWindowDock(wanted, info, extra)
 			layout = plan.Layout
 			if !plan.Suspended && math.Abs(plan.Delta) > 0.5 {
 				if !d.current(request.Serial) {
@@ -196,7 +219,7 @@ func (d *windowDock) run() {
 				accepted, geometry := resizeDockWindow(d.endpoint, pid, request, info, plan.Delta)
 				if accepted {
 					ownedGeometry = geometry
-					pendingBase = info.ClientWidth - extra
+					pendingBefore, pendingExtra = info.ClientWidth, extra
 					pendingTarget = info.ClientWidth + plan.Delta
 					extra = plan.Extra
 					expectedWidth = request.Width + plan.Delta*info.PixelScale

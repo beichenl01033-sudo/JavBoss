@@ -22,7 +22,7 @@ func readDockWindow(pid int) (dockWindowInfo, bool) {
 	return dockWindowInfo{
 		X: float64(values[0]), Y: float64(values[1]), Width: float64(values[2]), Height: float64(values[3]),
 		ClientWidth: float64(values[2]), ClientHeight: float64(values[3]), WorkX: float64(values[4]), WorkY: float64(values[5]),
-		WorkWidth: float64(values[6]), WorkHeight: float64(values[7]), PixelScale: float64(values[8]),
+		WorkWidth: float64(values[6]), WorkHeight: float64(values[7]), PixelScale: float64(values[8]), NativeState: true, GeometryState: true,
 	}, true
 }
 

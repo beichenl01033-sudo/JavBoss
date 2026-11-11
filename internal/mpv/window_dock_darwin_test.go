@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,9 +17,21 @@ func TestAdaptiveWindowDockWithMPV(t *testing.T) {
 	if mpvPath == "" {
 		t.Skip("set JAVBOSS_TEST_MPV_GUI for real native window docking")
 	}
+	if os.Getenv("JAVBOSS_MPV_DOCK_HELPER") == "" {
+		self, err := os.Executable()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.Command(self, "-test.run=^TestAdaptiveWindowDockWithMPV$", "-test.v")
+		cmd.Env = append(os.Environ(), "JAVBOSS_MPV_DOCK_HELPER=1")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("dock integration: %v\n%s", err, output)
+		}
+		return
+	}
 	root := t.TempDir()
 	wrapper := filepath.Join(root, "mpv-dock")
-	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec \""+mpvPath+"\" \"$@\" --ao=null --geometry=640x480+20+40 --script-opts=playlist_sidebar-cover_preview=no --image-display-duration=inf --title='JavBoss Adaptive Sidebar Test'\n"), 0700); err != nil {
+	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec \""+mpvPath+"\" \"$@\" --ao=null --native-fs=no --geometry=640x480+20+40 --script-opts=playlist_sidebar-cover_preview=no --image-display-duration=inf --title='JavBoss Adaptive Sidebar Test'\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("MPV_PATH", wrapper)
@@ -51,6 +64,14 @@ func TestAdaptiveWindowDockWithMPV(t *testing.T) {
 	waitMPVTestProperty(t, endpoint, "osd-width", float64(640))
 	pid := session.cmd.Process.Pid
 	before, ok := readDockWindow(pid)
+	deadline := time.Now().Add(2 * time.Second)
+	for !ok || math.Abs(before.ClientWidth*before.PixelScale-640) > 1 || math.Abs(before.ClientHeight*before.PixelScale-480) > 1 {
+		if time.Now().After(deadline) {
+			t.Fatalf("native opening animation did not settle: %+v", before)
+		}
+		time.Sleep(20 * time.Millisecond)
+		before, ok = readDockWindow(pid)
+	}
 	if !ok {
 		t.Fatal("native window bounds unavailable")
 	}
@@ -76,6 +97,22 @@ func TestAdaptiveWindowDockWithMPV(t *testing.T) {
 			t.Fatalf("native bounds changed incorrectly: before=%+v after=%+v", before, after)
 		}
 	}
+	// Fullscreen may shrink the video for a sidebar, but must never resize the
+	// native fullscreen window or consume its saved non-fullscreen extra width.
+	screenWidth := readMPVTestProperty(t, endpoint, "display-width")
+	command("set_property", "fullscreen", true)
+	waitMPVTestProperty(t, endpoint, "osd-width", screenWidth)
+	waitMPVTestProperty(t, endpoint, "user-data/javboss/window-dock-layout/controls_width", screenWidth)
+	command("script-message-to", "playlist_sidebar", "hide")
+	waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-sidebar-width", float64(0))
+	if readMPVTestProperty(t, endpoint, "osd-width") != screenWidth {
+		t.Fatal("hiding resized fullscreen")
+	}
+	command("script-message-to", "playlist_sidebar", "show")
+	waitMPVTestProperty(t, endpoint, "user-data/javboss/playlist-sidebar-width", float64(320))
+	command("set_property", "fullscreen", false)
+	waitMPVTestProperty(t, endpoint, "osd-width", float64(960))
+	waitMPVTestProperty(t, endpoint, "user-data/javboss/window-dock-layout/controls_width", float64(640))
 	command("script-message-to", "playlist_sidebar", "hide")
 	waitMPVTestProperty(t, endpoint, "osd-width", float64(640))
 	waitMPVTestProperty(t, endpoint, "video-margin-ratio-right", float64(0))
@@ -88,6 +125,22 @@ func TestAdaptiveWindowDockWithMPV(t *testing.T) {
 	if math.Abs(final.Width-before.Width) > 2 {
 		t.Fatal("repeated toggles accumulated window width")
 	}
+	// A manual resize becomes the new baseline, rather than restoring an old
+	// rectangle on collapse. Subsequent files must not reapply temporary anchors.
+	command("script-message-to", "playlist_sidebar", "show")
+	waitMPVTestProperty(t, endpoint, "geometry", "960x480")
+	command("set_property", "geometry", "1060x480")
+	waitMPVTestProperty(t, endpoint, "osd-width", float64(1060))
+	waitMPVTestProperty(t, endpoint, "user-data/javboss/window-dock-layout/controls_width", float64(740))
+	secondImage, _ := filepath.Abs("../../web/public/icon-512.png")
+	command("loadfile", secondImage, "append")
+	command("playlist-play-index", 1)
+	waitMPVTestProperty(t, endpoint, "video-out-params/w", float64(512))
+	waitMPVTestProperty(t, endpoint, "osd-width", float64(1060))
+	command("script-message-to", "playlist_sidebar", "hide")
+	waitMPVTestProperty(t, endpoint, "osd-width", float64(740))
+	command("set_property", "geometry", "640x480+20+40")
+	waitMPVTestProperty(t, endpoint, "osd-width", float64(640))
 
 	// Near the monitor's right edge, keep the entire window and toolbar still
 	// and fit the video into the space left beside the sidebar.

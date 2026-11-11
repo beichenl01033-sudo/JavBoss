@@ -15,6 +15,7 @@ var (
 	dockGetMonitorInfo    = moduser32.NewProc("GetMonitorInfoW")
 	dockSetWindowPos      = moduser32.NewProc("SetWindowPos")
 	dockIsZoomed          = moduser32.NewProc("IsZoomed")
+	dockIsIconic          = moduser32.NewProc("IsIconic")
 	dockSetDPI            = moduser32.NewProc("SetThreadDpiAwarenessContext")
 )
 
@@ -58,10 +59,11 @@ func readDockWindow(pid int) (dockWindowInfo, bool) {
 		return dockWindowInfo{}, false
 	}
 	maximized, _, _ := dockIsZoomed.Call(uintptr(hwnd))
+	minimized, _, _ := dockIsIconic.Call(uintptr(hwnd))
 	return dockWindowInfo{
 		X: float64(frame.Left), Y: float64(frame.Top), Width: float64(frame.Right - frame.Left), Height: float64(frame.Bottom - frame.Top),
 		ClientWidth: float64(client.Right - client.Left), ClientHeight: float64(client.Bottom - client.Top), WorkX: float64(info.Work.Left), WorkY: float64(info.Work.Top),
-		WorkWidth: float64(info.Work.Right - info.Work.Left), WorkHeight: float64(info.Work.Bottom - info.Work.Top), PixelScale: 1, Maximized: maximized != 0,
+		WorkWidth: float64(info.Work.Right - info.Work.Left), WorkHeight: float64(info.Work.Bottom - info.Work.Top), PixelScale: 1, Maximized: maximized != 0, Minimized: minimized != 0, NativeState: true,
 	}, true
 }
 

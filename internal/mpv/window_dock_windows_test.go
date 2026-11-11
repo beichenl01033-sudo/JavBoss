@@ -42,4 +42,14 @@ func TestNativeWindowDockBoundsAndResize(t *testing.T) {
 	if math.Abs(final.Width-before.Width) > 1 || final.X != before.X || final.Y != before.Y {
 		t.Fatalf("native restoration drifted: before=%+v after=%+v", before, final)
 	}
+	procShowWindow.Call(hwnd, 6)
+	minimized, ok := readDockWindow(os.Getpid())
+	if !ok || !minimized.Minimized {
+		t.Fatal("minimized window was not detected")
+	}
+	plan := planWindowDock(windowDockRequest{Width: before.ClientWidth, Height: before.ClientHeight, Preferred: 120}, minimized, 120)
+	if !plan.Suspended || plan.Delta != 0 {
+		t.Fatal("minimized window would be resized")
+	}
+	procShowWindow.Call(hwnd, 9)
 }

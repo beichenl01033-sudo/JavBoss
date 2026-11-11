@@ -20,6 +20,7 @@ func TestWindowDockPlansPreserveControlsAndOwnedWidth(t *testing.T) {
 		{"close sidebar", 1520, 0, 560, 100, 1920, 1, false, false, -560, 960, 0},
 		{"not enough right space", 960, 560, 0, 700, 1920, 1, false, false, 0, 960, 0},
 		{"manual resize", 1620, 560, 560, 100, 1920, 1, false, false, 0, 1060, 560},
+		{"manual resize beyond left edge", 1060, 320, 320, -30, 1920, 1, false, false, 0, 740, 320},
 		{"move to smaller screen", 1520, 560, 560, 100, 1280, 1, false, false, -560, 960, 0},
 		{"fullscreen", 1920, 0, 560, 0, 1920, 1, true, false, 0, 1920, 560},
 		{"maximized", 1920, 560, 560, 0, 1920, 1, false, true, 0, 1920, 560},
@@ -62,5 +63,35 @@ func TestWindowDockRejectsInvalidAndStaleRequests(t *testing.T) {
 	dock.request(json.RawMessage(`{"serial":3,"width":960,"height":640,"preferred":0}`))
 	if dock.latest.Serial != 2 {
 		t.Fatal("request accepted after player shutdown")
+	}
+}
+
+func TestWindowDockSuspendsNativeMinimizedWindow(t *testing.T) {
+	info := dockWindowInfo{X: -32000, Y: -32000, Width: 160, Height: 40, ClientWidth: 960, PixelScale: 1, Minimized: true}
+	plan := planWindowDock(windowDockRequest{Width: 960, Height: 640, Preferred: 560}, info, 320)
+	if !plan.Suspended || plan.Delta != 0 || plan.Extra != 320 {
+		t.Fatalf("minimize lost ownership or resized: %+v", plan)
+	}
+}
+
+func TestWindowDockSuspendsFullscreenRestoreTransition(t *testing.T) {
+	info := dockWindowInfo{Width: 1920, Height: 1080, ClientWidth: 1920, ClientHeight: 1080, WorkWidth: 1920, WorkHeight: 1040, PixelScale: 1}
+	plan := planWindowDock(windowDockRequest{Width: 1920, Height: 1080, Preferred: 0}, info, 320)
+	if !plan.Suspended || plan.Delta != 0 || plan.Extra != 320 {
+		t.Fatalf("fullscreen restore lost the normal window baseline: %+v", plan)
+	}
+}
+
+func TestWindowDockReconcilesStaleCocoaMaximizedFlag(t *testing.T) {
+	info := dockWindowInfo{Width: 960, Height: 480, ClientWidth: 960, ClientHeight: 480, WorkWidth: 1920, WorkHeight: 960, PixelScale: 1, NativeState: true, GeometryState: true}
+	request := windowDockRequest{Width: 960, Height: 480, Preferred: 320, Maximized: true}
+	plan := planWindowDock(request, info, 320)
+	if plan.Suspended || plan.Layout.ControlsWidth != 640 {
+		t.Fatalf("stale maximize flag prevented normal restore: %+v", plan)
+	}
+	info.Height = 960
+	plan = planWindowDock(request, info, 320)
+	if !plan.Suspended {
+		t.Fatal("actual Cocoa zoom state was ignored")
 	}
 }

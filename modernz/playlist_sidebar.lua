@@ -84,8 +84,11 @@ local preview_hover_id = nil
 local refresh_hover = false
 local base_margin_right = mp.get_property_number("video-margin-ratio-right", 0) or 0
 local dock_serial, dock_signature = 0, ""
+local dock_waiting = false
+local request_render
 
 local function request_window_dock(preferred)
+    if dragging then return end -- Commit a dragged width on release, not mid-gesture.
     local w, h = mp.get_osd_size()
     if not w or not h or w < 1 or h < 1 then return end
     if not opts.dock_sidebar then preferred = 0 end
@@ -95,11 +98,23 @@ local function request_window_dock(preferred)
     local signature = table.concat({w,h,preferred,tostring(fullscreen),tostring(maximized),tostring(hidpi)}, ":")
     if signature == dock_signature then return end
     dock_signature, dock_serial = signature, dock_serial+1
+    dock_waiting = true
+    local serial = dock_serial
+    mp.add_timeout(0.75, function()
+        if dock_serial == serial then dock_waiting=false; request_render() end
+    end)
     mp.set_property_native("user-data/javboss/window-dock-request", {serial=dock_serial,
         width=w,height=h,preferred=preferred,fullscreen=fullscreen,maximized=maximized,hidpi=hidpi})
 end
 
 local function set_video_margin(ratio)
+    if opts.dock_sidebar and dock_waiting then
+        local layout = mp.get_property_native("user-data/javboss/window-dock-layout", {}) or {}
+        local w = select(1, mp.get_osd_size()) or 0
+        local acknowledged = layout.serial == dock_serial
+        local arrived = type(layout.window_width) == "number" and math.abs(layout.window_width-w) <= 1
+        if not arrived or (not acknowledged and not layout.expanded) then return end
+    end
     local margin = math.min(0.95, base_margin_right + ratio)
     if math.abs((mp.get_property_number("video-margin-ratio-right", 0) or 0)-margin) > 0.0001 then
         mp.set_property_number("video-margin-ratio-right", margin)
@@ -662,7 +677,7 @@ local function render()
     sidebar_visible = true
 end
 
-local function request_render()
+request_render = function()
     if render_pending then
         return
     end
