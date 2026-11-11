@@ -34,6 +34,7 @@ type playlistEvents struct {
 	reporter  *playback.Reporter
 	finished  []*playback.Reporter
 	covers    *playlistCovers
+	dock      *windowDock
 	done      chan struct{}
 }
 
@@ -70,13 +71,13 @@ func newPlaylistEvents(endpoint string) (*playlistEvents, error) {
 		_ = c.SetDeadline(time.Time{})
 	}
 	// Only explicit pauses and EOF stop an already started video's clock.
-	for i, name := range []string{"pause", "eof-reached", clipRequestProperty, playlistCoverRequestProperty} {
+	for i, name := range []string{"pause", "eof-reached", clipRequestProperty, playlistCoverRequestProperty, windowDockRequestProperty} {
 		if err := json.NewEncoder(conn).Encode(ipcRequest{Command: []any{"observe_property", i + 1, name}, RequestID: int64(i + 2)}); err != nil {
 			conn.Close()
 			return nil, err
 		}
 	}
-	events := &playlistEvents{conn: conn, done: make(chan struct{})}
+	events := &playlistEvents{conn: conn, done: make(chan struct{}), dock: newWindowDock(endpoint)}
 	playlistWatchers.Add(1)
 	go func() {
 		ticker := time.NewTicker(time.Second)
@@ -100,6 +101,7 @@ func newPlaylistEvents(endpoint string) (*playlistEvents, error) {
 		defer close(events.done)
 		defer conn.Close()
 		defer events.setPlaylistCovers(nil)
+		defer events.dock.cancel()
 		defer func() {
 			events.mu.Lock()
 			events.watch.advance(time.Now())
@@ -135,6 +137,9 @@ func newPlaylistEvents(endpoint string) (*playlistEvents, error) {
 }
 
 func (e *playlistEvents) close() {
+	if e.dock != nil {
+		e.dock.cancel()
+	}
 	e.setPlaylistCovers(nil)
 	_ = e.conn.Close()
 	if e.done != nil {
@@ -222,6 +227,12 @@ func (e *playlistEvents) handleAt(event playlistEvent, now time.Time) func() {
 		e.current = nil
 		e.loaded = false
 	case "property-change":
+		if event.Name == windowDockRequestProperty {
+			if e.dock != nil {
+				return func() { e.dock.request(event.Data) }
+			}
+			return nil
+		}
 		if event.Name == playlistCoverRequestProperty {
 			covers := e.covers
 			if covers != nil {

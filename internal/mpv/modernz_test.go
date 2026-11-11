@@ -153,7 +153,7 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 		`mp.create_osd_overlay("ass-events")`,
 		`local left = math.max(0, pane_left - math.floor(opts.resize_handle_width / 2))`,
 		`mp.commandv("playlist-play-index", index - 1)`,
-		`publish_width(pane_width * scale_x)`,
+		`publish_width(reserved_width * scale_x)`,
 		`pin_controls(true)`,
 		`value and "always" or "auto"`,
 		`{"mbtn_left", end_click, begin_click}`,
@@ -184,8 +184,8 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 			t.Fatalf("expected bundled playlist sidebar script to contain %q", expected)
 		}
 	}
-	if strings.Contains(string(script), `video-margin-ratio-right`) {
-		t.Fatal("playlist sidebar must overlay the video without changing its right margin")
+	if !strings.Contains(string(script), `set_video_margin(opts.dock_sidebar and reserved_width/width or 0)`) {
+		t.Fatal("docked sidebar must reserve video space with an explicit overlay fallback")
 	}
 	dragCheck := strings.Index(string(script), `if mouse_x and math.abs(mouse_x - pane_left) <= opts.resize_handle_width then`)
 	videoAreaCheck := strings.Index(string(script), `if not mouse_x or mouse_x < pane_left then`)
@@ -199,7 +199,7 @@ func TestBundledPlaylistSidebarIsPersistentAndInteractive(t *testing.T) {
 	}
 	for _, expected := range []string{
 		`displayresx = 0`,
-		`osc_param.playresx = osc_param.displayresx`,
+		`osc_param.playresx = control_canvas_width(osc_param.displayresx)`,
 		`set_osd(state.osd, osc_param.displayresx, osc_param.playresy, ass.text, 1000)`,
 	} {
 		if !strings.Contains(string(modernZScript), expected) {

@@ -1,0 +1,42 @@
+name: MPV window checks
+
+on:
+  push:
+    paths:
+      - internal/mpv/window_dock*
+      - modernz/playlist_sidebar.lua
+      - modernz/modernz.lua
+      - .github/workflows/mpv-window-checks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  windows:
+    name: Windows native docking and server build
+    runs-on: windows-2022
+    timeout-minutes: 15
+    env:
+      CGO_ENABLED: "1"
+      CC: gcc
+      GOCACHE: ${{ github.workspace }}/.gocache
+    steps:
+      - name: Keep source line endings for resource assertions
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Verify CGO compiler
+        run: gcc --version
+      - name: Test native window geometry and docking policy
+        run: go test -v -count=1 -timeout=3m ./internal/mpv -run 'Test(WindowDock|NativeWindowDock|BundledPlaylistSidebar)'
+      - name: Build complete server command
+        shell: pwsh
+        run: go build -o "$env:RUNNER_TEMP/javboss-window-test.exe" ./cmd/server
