@@ -14,6 +14,7 @@ local opts = {
     row_height = 35,
     show_covers = true,
     cover_preview = true,
+    dock_sidebar = true,
     preview_width = 240,
     min_preview_width = 180,
     font_size = 18,
@@ -81,6 +82,29 @@ local preview_width = 0
 local list_right = 0
 local preview_hover_id = nil
 local refresh_hover = false
+local base_margin_right = mp.get_property_number("video-margin-ratio-right", 0) or 0
+local dock_serial, dock_signature = 0, ""
+
+local function request_window_dock(preferred)
+    local w, h = mp.get_osd_size()
+    if not w or not h or w < 1 or h < 1 then return end
+    if not opts.dock_sidebar then preferred = 0 end
+    local fullscreen = mp.get_property_native("fullscreen", false)
+    local maximized = mp.get_property_native("window-maximized", false)
+    local hidpi = mp.get_property_native("hidpi-window-scale", false)
+    local signature = table.concat({w,h,preferred,tostring(fullscreen),tostring(maximized),tostring(hidpi)}, ":")
+    if signature == dock_signature then return end
+    dock_signature, dock_serial = signature, dock_serial+1
+    mp.set_property_native("user-data/javboss/window-dock-request", {serial=dock_serial,
+        width=w,height=h,preferred=preferred,fullscreen=fullscreen,maximized=maximized,hidpi=hidpi})
+end
+
+local function set_video_margin(ratio)
+    local margin = math.min(0.95, base_margin_right + ratio)
+    if math.abs((mp.get_property_number("video-margin-ratio-right", 0) or 0)-margin) > 0.0001 then
+        mp.set_property_number("video-margin-ratio-right", margin)
+    end
+end
 
 local function clear_bitmaps()
     for id in pairs(bitmap_ids) do mp.commandv("overlay-remove", id) end
@@ -155,6 +179,12 @@ local function hide_sidebar()
     handle_mouse_y = nil
     preview_hover_id = nil
     publish_width(0)
+    request_window_dock(0)
+    local layout = mp.get_property_native("user-data/javboss/window-dock-layout", {}) or {}
+    local w = select(1, mp.get_osd_size()) or 0
+    local owned = opts.dock_sidebar and layout.expanded and type(layout.extra_width) == "number"
+        and type(layout.window_width) == "number" and math.abs(layout.window_width-w) <= 3
+    set_video_margin(owned and w > 0 and layout.extra_width/w or 0)
     pin_controls(false)
 end
 
@@ -231,6 +261,13 @@ end
 
 local function panel_width(window_width, height)
     local maximum = math.max(1, math.floor(window_width * opts.max_width_ratio))
+    local desired_preview = preview_open and enhanced and opts.show_covers and height >= 400 and opts.preview_width or 0
+    request_window_dock((current_width+desired_preview)*scale_x)
+    local layout = mp.get_property_native("user-data/javboss/window-dock-layout", {}) or {}
+    if opts.dock_sidebar and layout.expanded and type(layout.window_width) == "number"
+        and math.abs(layout.window_width-window_width*scale_x) <= 3 then
+        maximum = math.max(1, window_width-160)
+    end
     preview_width = 0
     if preview_open and enhanced and opts.show_covers and height >= 400
         and maximum >= opts.min_width + opts.min_preview_width then
@@ -387,7 +424,7 @@ local function render()
     if not pixel_width or not pixel_height or pixel_width < 1 or pixel_height < 1
         or count == 0
         or (opts.auto_hide_single and count <= 1 and not point_playlist and not explicitly_opened)
-        or (opts.hide_fullscreen and fullscreen) then
+        or (opts.hide_fullscreen and fullscreen and not explicitly_opened) then
         hide_sidebar()
         return
     end
@@ -443,7 +480,14 @@ local function render()
         visible_start = clamp(visible_start, 1, math.max(1, #rows))
     end
 
-    publish_width(pane_width * scale_x)
+    local reserved_width = pane_width
+    local dock_layout = mp.get_property_native("user-data/javboss/window-dock-layout", {}) or {}
+    if opts.dock_sidebar and dock_layout.expanded and type(dock_layout.extra_width) == "number"
+        and type(dock_layout.window_width) == "number" and math.abs(dock_layout.window_width-width*scale_x) <= 3 then
+        reserved_width = math.max(reserved_width, dock_layout.extra_width/scale_x)
+    end
+    publish_width(reserved_width * scale_x)
+    set_video_margin(opts.dock_sidebar and reserved_width/width or 0)
     pin_controls(true)
 
     clear_bitmaps()
@@ -828,7 +872,7 @@ mp.set_key_bindings({
 }, section, "force")
 mp.disable_key_bindings(section)
 
-for _, property in ipairs({"playlist-pos", "fullscreen", "osd-dimensions", "display-hidpi-scale"}) do
+for _, property in ipairs({"playlist-pos", "fullscreen", "window-maximized", "osd-dimensions", "display-hidpi-scale", "display-names", "user-data/javboss/window-dock-layout"}) do
     mp.observe_property(property, "native", request_render)
 end
 for _, property in ipairs({"playlist", "user-data/javboss/playlist-titles", "user-data/javboss/playlist-highlights", "user-data/javboss/playlist-visuals"}) do

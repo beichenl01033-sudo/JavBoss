@@ -2855,6 +2855,16 @@ local function build_cache_seek_ranges()
     return nranges
 end
 
+local function control_canvas_width(display_width)
+    local width = select(1, mp.get_osd_size())
+    local layout = mp.get_property_native("user-data/javboss/window-dock-layout", {}) or {}
+    local controls = tonumber(layout.controls_width)
+    if width and width > 0 and controls and controls > 0 then
+        return display_width * math.min(1, controls/width)
+    end
+    return display_width
+end
+
 local function osc_init()
     msg.debug("osc_init")
 
@@ -2886,7 +2896,7 @@ local function osc_init()
         osc_param.display_aspect = display_aspect
     end
     osc_param.displayresx = osc_param.playresy * osc_param.display_aspect
-    osc_param.playresx = osc_param.displayresx
+    osc_param.playresx = control_canvas_width(osc_param.displayresx)
 
     -- stop seeking with the slider to prevent skipping files
     state.active_element = nil
@@ -3939,6 +3949,7 @@ mp.observe_property("osd-dimensions", "native", function()
     request_init_resize()
 end)
 mp.observe_property("osd-scale-by-window", "native", request_init_resize)
+mp.observe_property("user-data/javboss/window-dock-layout", "native", request_init_resize)
 mp.observe_property("touch-pos", "native", handle_touch)
 observe_cached("volume", request_tick)
 observe_cached("mute", request_tick)

@@ -78,7 +78,7 @@ func TestPlaylistCoversWithMPV(t *testing.T) {
 	wrapper := filepath.Join(root, "mpv-covers")
 	flags := " --vo=null --ao=null --force-window=no --image-display-duration=inf"
 	if gui != "" {
-		flags = " --ao=null --force-window=yes --geometry=960x640 --image-display-duration=inf --title='JavBoss Cover Playlist Preview'"
+		flags = " --ao=null --force-window=yes --geometry=960x640 --script-opts=playlist_sidebar-dock_sidebar=no --image-display-duration=inf --title='JavBoss Cover Playlist Preview'"
 	}
 	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec \""+executable+"\" \"$@\""+flags+"\n"), 0700); err != nil {
 		t.Fatal(err)

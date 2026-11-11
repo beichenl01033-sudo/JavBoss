@@ -40,6 +40,25 @@ local function run()
     fn,state=harness(false,"always")
     fn("auto",true)
     assert(not state.osc_visible,"release unexpectedly showed an already-hidden control bar")
+
+    local first = assert(source:find("local function control_canvas_width(display_width)",1,true))
+    local last = assert(source:find("local function osc_init()",first,true))
+    local width, layout = 960, {}
+    local environment = {mp={
+        get_osd_size=function() return width,640 end,
+        get_property_native=function() return layout end,
+    }}
+    setmetatable(environment,{__index=_G})
+    local canvas = assert(load(source:sub(first,last-1).."\nreturn control_canvas_width", "control width", "t", environment))()
+    assert(canvas(960)==960,"default control layout changed")
+    width,layout=1520,{controls_width=960}
+    assert(canvas(1520)==960,"expanding a sidebar recentered the buttons")
+    width,layout=960,{controls_width=960}
+    assert(canvas(960)==960,"fallback shrink recentered the buttons")
+    width,layout=3040,{controls_width=1920}
+    assert(canvas(1520)==960,"HiDPI changed the original button coordinates")
+    layout={controls_width=-1}
+    assert(canvas(1520)==1520,"invalid control width was accepted")
 end
 local ok,err=pcall(run)
 if ok then real_mp.msg.info("CONTROL_VISIBILITY_TESTS_PASSED") else real_mp.msg.error(tostring(err)) end

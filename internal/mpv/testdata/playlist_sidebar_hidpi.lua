@@ -72,6 +72,7 @@ local function harness(scale, width, height, position, overrides)
         register_event = function() end,
     }
     package.loaded["mp.options"] = {read_options = function(options)
+        options.dock_sidebar = false -- Legacy overlay behavior is tested separately.
         for key, value in pairs(overrides or {}) do options[key] = value end
     end}
     package.loaded["mp.utils"] = real_utils
@@ -342,6 +343,20 @@ local function run_tests()
     points:click(933, 29)
     points:click(900, 170)
     assert(points.commands[#points.commands][2] == 2, "folded preview groups lost native indices")
+
+    local docked = harness(1, 960, 640, 0, {dock_sidebar=true})
+    docked:change("user-data/javboss/playlist-visuals", {generation="dock",entries=entries})
+    assert(docked.properties["user-data/javboss/window-dock-request"].preferred == 560, "preferred dock width depended on cramped render width")
+    assert(docked.properties["video-margin-ratio-right"] > 0, "fallback sidebar covered the video")
+    docked.width = 1520
+    docked:change("user-data/javboss/window-dock-layout", {expanded=true,controls_width=960,window_width=1520})
+    near(docked.properties["user-data/javboss/playlist-sidebar-width"], 560)
+    near(docked.properties["video-margin-ratio-right"], 560/1520)
+    near(docked.properties["user-data/javboss/window-dock-request"].preferred, 560)
+    docked.messages.hide()
+    docked:flush()
+    near(docked.properties["user-data/javboss/window-dock-request"].preferred, 0)
+    near(docked.properties["video-margin-ratio-right"], 0)
 end
 
 local ok, err = pcall(run_tests)
