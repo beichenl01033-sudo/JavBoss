@@ -69,6 +69,7 @@ local rows_dirty = true
 local rows, groups, entry_rows = {}, {}, {}
 local playlist_snapshot, points_snapshot, visuals = {}, {}, {}
 local images, collapsed_groups, bitmap_ids = {}, {}, {}
+local next_bitmap_ids = {}
 local generation = ""
 local request_serial = 0
 local last_cover_request = ""
@@ -123,7 +124,16 @@ end
 
 local function clear_bitmaps()
     for id in pairs(bitmap_ids) do mp.commandv("overlay-remove", id) end
-    bitmap_ids = {}
+    bitmap_ids, next_bitmap_ids = {}, {}
+end
+
+local function finish_bitmaps()
+    -- Replace changed IDs in place and remove only slots no longer visible.
+    -- Clearing all IDs between renders lets MPV present an empty cover frame.
+    for id in pairs(bitmap_ids) do
+        if not next_bitmap_ids[id] then mp.commandv("overlay-remove", id) end
+    end
+    bitmap_ids = next_bitmap_ids
 end
 
 local function clamp(value, minimum, maximum)
@@ -340,12 +350,15 @@ local function draw_cover(parts, key, x, y, slot, requests, box_width, box_heigh
         if id <= 63 then
             local fit = math.min(box_width / cover.width, box_height / cover.height)
             local draw_width, draw_height = cover.width * fit, cover.height * fit
-            local ok, _, err = pcall(mp.command_native, {name="overlay-add", id=id,
+            local bitmap = {name="overlay-add", id=id,
                 x=math.floor((x+(box_width-draw_width)/2)*scale_x+0.5),
                 y=math.floor((y+(box_height-draw_height)/2)*scale_y+0.5), file=cover.path,
                 offset=0, fmt="bgra", w=cover.width, h=cover.height, stride=cover.width*4,
-                dw=math.max(1,math.floor(draw_width*scale_x+0.5)), dh=math.max(1,math.floor(draw_height*scale_y+0.5))})
-            if ok and not err then bitmap_ids[id] = true; return end
+                dw=math.max(1,math.floor(draw_width*scale_x+0.5)), dh=math.max(1,math.floor(draw_height*scale_y+0.5))}
+            local signature = table.concat({cover.path,bitmap.x,bitmap.y,bitmap.w,bitmap.h,bitmap.dw,bitmap.dh}, "\0")
+            if bitmap_ids[id] == signature then next_bitmap_ids[id] = signature; return end
+            local ok, _, err = pcall(mp.command_native, bitmap)
+            if ok and not err then next_bitmap_ids[id] = signature; return end
             images[key] = false
         end
     elseif key and images[key] == nil then
@@ -397,7 +410,7 @@ local function draw_preview(parts, index, current, slot, requests)
     local box_height = math.min(360, math.max(48, content_bottom-y-88))
     parts[#parts+1] = string.format("{\\an7\\pos(%d,%d)\\bord0\\shad0\\fs12\\fn%s\\1c&H9297A2&}%s",
         x, opts.header_height+12, sidebar_font, index == current and "正在播放" or "封面预览 · 点击列表播放")
-    if visual.key then table.insert(requests, 1, visual.key) end
+    if visual.key and images[visual.key] == nil then table.insert(requests, 1, visual.key) end
     draw_cover(parts, visual.key, x, y, slot, requests, box_width, box_height)
     for line, text in ipairs(preview_title_lines(title, math.max(4, math.floor(box_width / 16)-1))) do
         parts[#parts+1] = string.format("{\\an7\\pos(%d,%d)\\clip(%d,%d,%d,%d)\\bord0\\shad0\\fs16\\fn%s\\1c&HFFFFFF&}%s",
@@ -505,7 +518,7 @@ local function render()
     set_video_margin(opts.dock_sidebar and reserved_width/width or 0)
     pin_controls(true)
 
-    clear_bitmaps()
+    next_bitmap_ids = {}
     local parts, requests = {}, {}
     append_rect(parts, pane_left, 0, width, panel_bottom, "17191F", "08")
     append_rect(parts, pane_left, opts.header_height - 1, width, opts.header_height, "424650", "00")
@@ -622,6 +635,7 @@ local function render()
         end
     end
     if preview_width > 0 then draw_preview(parts, preview_index, current, cover_slot+1, requests) end
+    finish_bitmaps()
     mp.set_property_number("user-data/javboss/playlist-preview-index", preview_width > 0 and preview_index-1 or -1)
     mp.set_property_native("user-data/javboss/playlist-preview-visible", preview_width > 0)
     request_covers(requests)

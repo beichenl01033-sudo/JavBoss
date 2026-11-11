@@ -64,6 +64,7 @@ local function harness(scale, width, height, position, overrides)
         end,
         command_native = function(command)
             state.bitmaps[#state.bitmaps+1] = command
+            if command.file == state.fail_bitmap_path then return nil, "bitmap load failed" end
             state.active_bitmaps[command.id] = command
             return true
         end,
@@ -309,6 +310,63 @@ local function run_tests()
         assert(not preview.overlay.visible and next(preview.active_bitmaps) == nil, "fullscreen retained a preview bitmap")
     end
 
+    -- Cached artwork must survive ASS-only changes. Replacing an occupied
+    -- bitmap ID is intentional; removing it first exposes a blank frame.
+    for _, scale in ipairs({1, 1.25, 2}) do
+        local stable = harness(scale)
+        stable:change("user-data/javboss/playlist-visuals", {generation="stable",entries=entries})
+        local covers = {}
+        for i=1,40 do covers["video-"..i]={path="poster-"..i..".bgra",width=256,height=512} end
+        stable.messages["covers-ready"]("stable",real_utils.format_json(covers))
+        stable:flush()
+        local serial = stable.properties["user-data/javboss/playlist-cover-request"].serial
+        local function expect_changes(adds, removes, action)
+            local previous_adds, previous_commands = #stable.bitmaps, #stable.commands
+            action()
+            stable:flush()
+            local removed = 0
+            for index=previous_commands+1,#stable.commands do
+                if stable.commands[index][1] == "overlay-remove" then removed=removed+1 end
+            end
+            assert(#stable.bitmaps-previous_adds == adds, "redrew unchanged cached artwork")
+            assert(removed == removes, "removed a bitmap before replacing it")
+        end
+        expect_changes(0,0,function()
+            stable:mouse(600,80); stable.bindings.mouse_move[2]()
+        end)
+        expect_changes(1,0,function()
+            stable:mouse(600,150); stable.bindings.mouse_move[2]()
+        end)
+        expect_changes(0,0,function()
+            stable:mouse(610,155); stable.bindings.mouse_move[2]()
+            stable.messages["covers-ready"]("stable",real_utils.format_json(covers))
+        end)
+        expect_changes(0,0,function()
+            stable:mouse(440,155); stable.bindings.mouse_move[2]()
+        end)
+        expect_changes(0,0,function()
+            stable:mouse(440,165); stable.bindings.mouse_move[2]()
+        end)
+        expect_changes(6,0,function()
+            stable:mouse(900,165); stable.bindings.mouse_move[2]()
+            stable.bindings.wheel_down[2]()
+        end)
+        assert(stable.properties["user-data/javboss/playlist-cover-request"].serial == serial,
+            "hover requested artwork already in the Lua cache")
+        stable.fail_bitmap_path="broken.bgra"
+        stable.messages["covers-ready"]("stable",real_utils.format_json({["video-2"]={path="broken.bgra",width=256,height=512}}))
+        stable:flush()
+        for _, bitmap in pairs(stable.active_bitmaps) do
+            assert(bitmap.file ~= "poster-2.bgra", "failed preview retained the previous image")
+        end
+        stable.messages.hide(); stable:flush()
+        assert(next(stable.active_bitmaps)==nil, "hiding left cached artwork visible")
+        stable.messages.show(); stable:flush()
+        assert(next(stable.active_bitmaps)~=nil, "reopening did not restore artwork")
+        stable:change("user-data/javboss/playlist-visuals", {generation="replacement",entries=entries})
+        assert(next(stable.active_bitmaps)==nil, "new playlist retained old artwork")
+    end
+
     local narrow = harness(1, 640, 600)
     narrow:change("user-data/javboss/playlist-visuals", {generation="narrow", entries=entries})
     assert(not narrow.properties["user-data/javboss/playlist-preview-visible"], "preview squeezed a narrow list")
@@ -343,6 +401,25 @@ local function run_tests()
     points:click(933, 29)
     points:click(900, 170)
     assert(points.commands[#points.commands][2] == 2, "folded preview groups lost native indices")
+
+    local shared = harness(1)
+    shared.properties.playlist = points.properties.playlist
+    shared.properties["user-data/javboss/playlist-highlights"] = points.properties["user-data/javboss/playlist-highlights"]
+    shared:change("user-data/javboss/playlist-visuals", {generation="shared",entries={
+        ["101"]={key="a",title="Video A"},["102"]={key="a",title="Video A"},["103"]={key="b",title="Video B"},
+    }})
+    shared.messages["covers-ready"]("shared",real_utils.format_json({
+        a={path="shared-a.bgra",width=256,height=512},b={path="shared-b.bgra",width=256,height=512},
+    }))
+    shared:flush()
+    local shared_adds, shared_commands = #shared.bitmaps,#shared.commands
+    shared:mouse(600,170); shared.bindings.mouse_move[2](); shared:flush()
+    near(shared.properties["user-data/javboss/playlist-preview-index"],1)
+    assert(#shared.bitmaps==shared_adds and #shared.commands==shared_commands,
+        "moving between a video's highlights rebuilt its shared cover")
+    shared:mouse(600,220); shared.bindings.mouse_move[2](); shared:flush()
+    assert(#shared.bitmaps==shared_adds+1 and #shared.commands==shared_commands,
+        "switching highlight videos rebuilt all covers")
 
     local docked = harness(1, 960, 640, 0, {dock_sidebar=true})
     docked:change("user-data/javboss/playlist-visuals", {generation="dock",entries=entries})
