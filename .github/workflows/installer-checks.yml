@@ -38,12 +38,15 @@ jobs:
       - name: Verify PowerShell runtime
         env:
           JAVBOSS_TEST_POWERSHELL: ${{ matrix.powershell }}
-        shell: pwsh
+        shell: ${{ matrix.powershell }}
         run: |
           & $env:JAVBOSS_TEST_POWERSHELL -NoProfile -Command '$PSVersionTable.PSVersion; exit 0'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test Windows installers without network or production data
         env:
           JAVBOSS_TEST_POWERSHELL: ${{ matrix.powershell }}
-        shell: pwsh
+        # Launch tests from the matching runtime. A pwsh parent exports its
+        # PSModulePath to Windows PowerShell 5.1, which can load an Archive
+        # module requiring .NET APIs unavailable in the legacy runtime.
+        shell: ${{ matrix.powershell }}
         run: node --test scripts/cli/tests/install.test.mjs scripts/cli/tests/install-personal.test.mjs
