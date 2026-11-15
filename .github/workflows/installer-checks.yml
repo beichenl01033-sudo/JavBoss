@@ -38,15 +38,21 @@ jobs:
       - name: Verify PowerShell runtime
         env:
           JAVBOSS_TEST_POWERSHELL: ${{ matrix.powershell }}
-        shell: ${{ matrix.powershell }}
+        shell: pwsh
         run: |
+          if ($env:JAVBOSS_TEST_POWERSHELL -eq 'powershell') {
+            $env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine')
+          }
           & $env:JAVBOSS_TEST_POWERSHELL -NoProfile -Command '$PSVersionTable.PSVersion; exit 0'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test Windows installers without network or production data
         env:
           JAVBOSS_TEST_POWERSHELL: ${{ matrix.powershell }}
-        # Launch tests from the matching runtime. A pwsh parent exports its
-        # PSModulePath to Windows PowerShell 5.1, which can load an Archive
-        # module requiring .NET APIs unavailable in the legacy runtime.
-        shell: ${{ matrix.powershell }}
-        run: node --test scripts/cli/tests/install.test.mjs scripts/cli/tests/install-personal.test.mjs
+        shell: pwsh
+        run: |
+          # Do not export PowerShell 7 module paths to Windows PowerShell 5.1.
+          # Its Archive module must use the legacy runtime's .NET APIs.
+          if ($env:JAVBOSS_TEST_POWERSHELL -eq 'powershell') {
+            $env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine')
+          }
+          node --test scripts/cli/tests/install.test.mjs scripts/cli/tests/install-personal.test.mjs
