@@ -99,6 +99,11 @@ func TestHighlightAPIAndQueuePreserveTimeZeroAndSidecars(t *testing.T) {
 	if len(played) != 2 || playedStart != 0 || !played[0].Options.HighlightMode || played[0].Options.StartTimeSec != 0 || played[0].Options.HighlightPreviewSeconds != 30 {
 		t.Fatalf("zero start lost: %+v", played)
 	}
+	for _, item := range played {
+		if item.Cover == nil || item.Options.ResolveSubtitle == nil || item.Options.SaveSubtitleOffset == nil || item.Options.SaveSubtitleSelection == nil {
+			t.Fatal("highlight playback lost artwork or subtitle callbacks")
+		}
+	}
 	if played[1].Path != played[0].Path || played[1].Options.StartTimeSec != 15 || played[1].Highlight.Time != 20 || played[1].Highlight.Number != 2 || played[1].Title != "movie.mp4 - twenty · 0:20" {
 		t.Fatalf("points not expanded distinctly: %+v", played)
 	}

@@ -23,6 +23,8 @@ var modernZRequiredFiles = []struct {
 	{source: "javboss_control.lua", target: filepath.Join("scripts", "javboss_control.lua")},
 	{source: "javboss_highlight_sidebar.lua", target: filepath.Join("scripts", "javboss_highlight_sidebar.lua")},
 	{source: "window_geometry.lua", target: filepath.Join("scripts", "window_geometry.lua")},
+	{source: "subtitles.lua", target: filepath.Join("scripts", "subtitles.lua")},
+	{source: "subtitle_offset_input.lua", target: filepath.Join("scripts", "subtitle_offset_input.lua")},
 }
 
 type modernZAssets struct {
@@ -33,6 +35,7 @@ type modernZAssets struct {
 	ControlScriptPath        string
 	HighlightSidebarPath     string
 	WindowGeometryScriptPath string
+	SubtitleScriptPath       string
 }
 
 func ensureModernZAssets() (modernZAssets, error) {
@@ -62,6 +65,7 @@ func ensureModernZAssets() (modernZAssets, error) {
 		ControlScriptPath:        filepath.Join(configDir, "scripts", "javboss_control.lua"),
 		HighlightSidebarPath:     filepath.Join(configDir, "scripts", "javboss_highlight_sidebar.lua"),
 		WindowGeometryScriptPath: filepath.Join(configDir, "scripts", "window_geometry.lua"),
+		SubtitleScriptPath:       filepath.Join(configDir, "scripts", "subtitles.lua"),
 	}, nil
 }
 
@@ -121,7 +125,7 @@ func findModernZSourceDir() (string, error) {
 		}
 	}
 
-	return "", errors.New("ModernZ assets not found; expected ModernZ, thumbfast, and playlist sidebar assets")
+	return "", errors.New("ModernZ assets not found; expected ModernZ, thumbfast, playlist sidebar, and subtitle assets")
 }
 
 func modernZCandidateDirs(base string) []string {

@@ -19,6 +19,8 @@ func TestEnsureModernZAssetsCopiesScriptOptionsAndFont(t *testing.T) {
 		"javboss_control.lua":           "-- javboss control lua\n",
 		"javboss_highlight_sidebar.lua": "-- javboss highlight sidebar lua\n",
 		"window_geometry.lua":           "-- window geometry lua\n",
+		"subtitles.lua":                 "-- subtitles lua\n",
+		"subtitle_offset_input.lua":     "-- subtitle offset input lua\n",
 	}
 	sourceDir := writeModernZTestAssets(t)
 
@@ -39,6 +41,8 @@ func TestEnsureModernZAssetsCopiesScriptOptionsAndFont(t *testing.T) {
 		filepath.Join(assets.ConfigDir, "script-opts", "playlist_sidebar.conf"):     files["playlist_sidebar.conf"],
 		filepath.Join(assets.ConfigDir, "scripts", "javboss_control.lua"):           files["javboss_control.lua"],
 		filepath.Join(assets.ConfigDir, "scripts", "javboss_highlight_sidebar.lua"): files["javboss_highlight_sidebar.lua"],
+		assets.SubtitleScriptPath: files["subtitles.lua"],
+		filepath.Join(assets.ConfigDir, "scripts", "subtitle_offset_input.lua"): files["subtitle_offset_input.lua"],
 		assets.ScriptPath:               files["modernz.lua"],
 		assets.ThumbfastScriptPath:      files["thumbfast.lua"],
 		assets.PlaylistScriptPath:       files["playlist_sidebar.lua"],
@@ -299,7 +303,7 @@ func TestSessionPathsSharePerProcessRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sessionDir returned error: %v", err)
 	}
-	expected := []string{inputPath, configPath, modernZ.ConfigDir, modernZ.ScriptPath, modernZ.ThumbfastScriptPath, modernZ.PlaylistScriptPath, modernZ.ControlScriptPath, modernZ.HighlightSidebarPath}
+	expected := []string{inputPath, configPath, modernZ.ConfigDir, modernZ.ScriptPath, modernZ.ThumbfastScriptPath, modernZ.PlaylistScriptPath, modernZ.ControlScriptPath, modernZ.HighlightSidebarPath, modernZ.WindowGeometryScriptPath, modernZ.SubtitleScriptPath}
 	for _, path := range expected {
 		if !strings.HasPrefix(path, root+string(os.PathSeparator)) {
 			t.Fatalf("expected %s to be under isolated mpv session dir %s", path, root)
@@ -322,6 +326,8 @@ func writeModernZTestAssets(t *testing.T) string {
 		"javboss_control.lua":           "-- javboss control lua\n",
 		"javboss_highlight_sidebar.lua": "-- javboss highlight sidebar lua\n",
 		"window_geometry.lua":           "-- window geometry lua\n",
+		"subtitles.lua":                 "-- subtitles lua\n",
+		"subtitle_offset_input.lua":     "-- subtitle offset input lua\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(sourceDir, name), []byte(content), 0o644); err != nil {

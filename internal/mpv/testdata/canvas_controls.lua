@@ -3,7 +3,20 @@ local real_options = require "mp.options"
 local source = real_mp.get_opt("test-script")
 local now, x, y = 0, 300, 200
 local properties = { path = "video.mp4", ["input-doubleclick-time"] = 300, ["display-hidpi-scale"] = 1, ["user-data/javboss/playlist-sidebar-width"] = 320 }
-local timers, bindings, events, commands = {}, {}, {}, {}
+local timers, bindings, events, commands, messages = {}, {}, {}, {}, {}
+local real_input = package.loaded["mp.input"]
+local selection
+local fake_input = {
+    select = function(value)
+        assert(selection == nil, "opened a submenu before the previous input handler closed")
+        selection = value
+    end,
+    terminate = function()
+        local current = selection
+        if current and current.closed then current.closed() end
+        selection = nil
+    end,
+}
 local function property(name, fallback) if properties[name] == nil then return fallback end return properties[name] end
 local fake_mp = {
     get_property = property, get_property_number = property, get_property_native = property,
@@ -12,7 +25,7 @@ local fake_mp = {
     get_osd_size = function() return 1000, 700 end,
     add_key_binding = function(_, name, fn) bindings[name] = fn end,
     register_event = function(name, fn) events[name] = events[name] or {}; table.insert(events[name], fn) end,
-    register_script_message = function() end, observe_property = function() end,
+    register_script_message = function(name, fn) messages[name] = fn end, observe_property = function() end,
     add_periodic_timer = function() end,
     add_timeout = function(delay, fn)
         local timer = { due = now + delay, fn = fn }
@@ -24,9 +37,11 @@ local fake_mp = {
 }
 package.loaded["mp"] = fake_mp
 package.loaded["mp.options"] = { read_options = function() end }
+package.loaded["mp.input"] = fake_input
 dofile(source)
 package.loaded["mp"] = real_mp
 package.loaded["mp.options"] = real_options
+package.loaded["mp.input"] = real_input
 local function advance(seconds)
     now = now + seconds
     local pending = timers
@@ -65,6 +80,34 @@ local function run()
     assert(#commands == 0, "a held click paused a different video")
     bindings["canvas-click"]({event="down"}); bindings["canvas-click"]({event="up", canceled=true}); advance(0.4)
     assert(#commands == 0, "canceled click toggled pause")
+
+    properties["user-data/javboss/subtitle-editable"] = true
+    properties["track-list"] = {}
+    messages["more-menu"]()
+    local subtitle_index, speed_index
+    for index, label in ipairs(selection.items) do
+        if label == "字幕…" then subtitle_index = index end
+        if label:find("倍速",1,true) then speed_index = index end
+    end
+    assert(subtitle_index and speed_index, "subtitle lookup is hidden when no subtitle track exists")
+    selection.submit(subtitle_index)
+    assert(#commands == 0, "submenu opened during the previous menu's cleanup")
+    advance(0.01)
+    assert(commands[1][1] == "script-message" and commands[1][2] == "javboss-subtitle-menu",
+        "More did not open the subtitle lookup/offset menu")
+    messages["more-menu"]()
+    selection.submit(speed_index)
+    advance(0.01)
+    assert(selection and selection.prompt == "播放速度", "speed submenu no longer opens")
+    fake_input.terminate()
+    properties["user-data/javboss/subtitle-editable"] = false
+    messages["more-menu"]()
+    for _, label in ipairs(selection.items) do assert(label ~= "字幕…", "unsupported playback exposed subtitle actions") end
+    fake_input.terminate()
+    properties["track-list"] = {{type="sub",id=1}}
+    messages["more-menu"]()
+    assert(selection.items[1] == "字幕…", "existing subtitle tracks lost their menu")
+    fake_input.terminate()
 end
 local ok, err = pcall(run)
 if ok then real_mp.msg.info("CANVAS_CLICK_TESTS_PASSED") else real_mp.msg.error(tostring(err)) end

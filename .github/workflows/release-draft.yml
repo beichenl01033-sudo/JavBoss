@@ -93,7 +93,7 @@ jobs:
           const archive = `release/javboss-${process.env.RELEASE}-${platform}.zip`;
           execFileSync('unzip', ['-tq', archive], { stdio: 'inherit' });
           const entries = execFileSync('unzip', ['-Z1', archive], { encoding: 'utf8' }).trim().split('\n');
-          const common = ['config.toml', 'web/dist/index.html', 'modernz/modernz.lua', 'modernz/playlist_sidebar.lua', 'modernz/playlist_sidebar.conf', 'modernz/javboss_highlight_sidebar.lua', 'modernz/javboss_control.lua', 'modernz/window_geometry.lua'];
+          const common = ['config.toml', 'web/dist/index.html', 'modernz/modernz.lua', 'modernz/playlist_sidebar.lua', 'modernz/playlist_sidebar.conf', 'modernz/javboss_highlight_sidebar.lua', 'modernz/javboss_control.lua', 'modernz/window_geometry.lua', 'modernz/subtitles.lua', 'modernz/subtitle_offset_input.lua'];
           const binaries = platform === 'windows-x86_64'
             ? ['javboss.exe', 'internal/bin/ffprobe.exe', 'internal/bin/mpv/mpv.exe']
             : ['javboss', 'javboss.command', 'internal/bin/ffprobe', 'internal/bin/ffmpeg', 'internal/bin/mpv/mpv.app/Contents/MacOS/mpv'];
