@@ -56,6 +56,9 @@ func TestPlaylistPlaysLocalGrantsAndStartsScreenshotSync(t *testing.T) {
 		t.Fatalf("start index=%d, want 1", playedStartIndex)
 	}
 	for i, item := range played {
+		if item.Cover == nil || item.Options.ResolveSubtitle == nil || item.Options.SaveSubtitleOffset == nil || item.Options.SaveSubtitleSelection == nil {
+			t.Fatal("client playlist lost artwork or subtitle callbacks")
+		}
 		if item.Options.VideoID != int64(42+i) || !item.Options.EnableNetworkThumbnail {
 			t.Fatalf("incorrect per-file options: %+v", item.Options)
 		}

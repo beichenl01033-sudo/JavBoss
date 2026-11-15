@@ -537,8 +537,8 @@ local function more_menu()
     if has_track("audio") then
         add("音轨…", function() mp.commandv("script-binding", "select/select-aid") end)
     end
-    if has_track("sub") then
-        add("字幕…", function() mp.commandv("script-binding", "select/select-sid") end)
+    if has_track("sub") or mp.get_property_native("user-data/javboss/subtitle-editable", false) then
+        add("字幕…", function() mp.commandv("script-message", "javboss-subtitle-menu") end)
     end
     local speed = mp.get_property_number("speed", 1) or 1
     add(string.format("倍速… (%gx)", speed), speed_menu)
@@ -553,12 +553,19 @@ local function more_menu()
         add((tonumber(review_options().preview_seconds) or 0) > 0 and "关闭亮点自动预览" or "开启亮点自动预览（30 秒）", toggle_preview)
     end
 
+    local selected_action
     input.select({
         prompt = "更多",
         items = items,
+        keep_open = true,
+        closed = function()
+            -- MPV unregisters this input handler after closed returns. Wait
+            -- until cleanup finishes before opening the subtitle/speed menu.
+            if selected_action then mp.add_timeout(0, selected_action) end
+        end,
         submit = function(index)
-            local action = actions[index]
-            if action then action() end
+            selected_action = actions[index]
+            input.terminate()
         end,
     })
 end

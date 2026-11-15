@@ -198,6 +198,7 @@ export default function usePlayback({ showCenterToast, showToast }) {
       const payload = {
         id: video.id,
         locationId: video.location_id,
+        title: video.filename,
         path: getVideoRelPath(video),
         dirPath: getVideoDirPath(video),
       }
@@ -238,6 +239,7 @@ export default function usePlayback({ showCenterToast, showToast }) {
       playVideoFile({
         id: video.id,
         locationId: video.location_id,
+        title: video.filename,
         path: getVideoRelPath(video),
         dirPath: getVideoDirPath(video),
         startTime,
