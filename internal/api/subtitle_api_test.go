@@ -97,6 +97,13 @@ func TestSubtitleEndpointSettingsLocationAttributionAndCache(t *testing.T) {
 		return w
 	}
 	path := fmt.Sprintf("/videos/%d/subtitles/resolve", video.ID)
+	if w := call(path, `{"settings_only":true}`, 204); w.Header().Get("X-Subtitle-Status") == "disabled" {
+		t.Fatal("missing preference disabled the default automatic lookup")
+	}
+	if file, err := localSubtitleResolver(video.ID, second.ID, "")(context.Background(), mpv.SubtitleRequest{SettingsOnly: true}); err != nil || file == nil || file.Status == "disabled" {
+		t.Fatalf("MPV default automatic lookup disabled: %+v %v", file, err)
+	}
+	call("/config", `{"subtitle_auto_download":false}`, 200)
 	if w := call(path, `{}`, 204); w.Header().Get("X-Subtitle-Status") != "disabled" {
 		t.Fatal(w.Header())
 	}

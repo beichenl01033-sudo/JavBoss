@@ -28,6 +28,11 @@ import (
 // nor any player knows which concrete providers are installed.
 var subtitleService = subtitle.NewService(subtitlecat.New(util.DefaultHTTPClient()))
 
+// An absent preference uses the new default without overwriting an explicit opt-out.
+func subtitleAutoDownloadEnabled(cfg map[string]string) bool {
+	return cfg["subtitle_auto_download"] == "" || cfg["subtitle_auto_download"] == "true"
+}
+
 // POST /videos/:id/subtitles/resolve accepts {location_id, format: "srt"|"vtt"}.
 // location_id=0 selects the primary location. 200 returns a subtitle file;
 // 204 carries X-Subtitle-Status (disabled/not_found/existing/ambiguous).
@@ -81,7 +86,7 @@ func resolveSubtitle(c *gin.Context) {
 			respondLocalizedError(c, 500, "读取字幕设置失败", "Could not read subtitle settings")
 			return
 		}
-		if cfg["subtitle_auto_download"] != "true" {
+		if !subtitleAutoDownloadEnabled(cfg) {
 			c.Header("X-Subtitle-Status", "disabled")
 		}
 		c.Status(http.StatusNoContent)
@@ -162,7 +167,7 @@ func resolveVideoSubtitle(ctx context.Context, video *models.Video, request mpv.
 	if err != nil {
 		return nil, "", err
 	}
-	allowDownload := !request.CacheOnly && (request.Manual || cfg["subtitle_auto_download"] == "true")
+	allowDownload := !request.CacheOnly && (request.Manual || subtitleAutoDownloadEnabled(cfg))
 	languages := []string{"zh-CN", "zh-TW"}
 	if cfg["subtitle_language"] == "zh-TW" {
 		languages = []string{"zh-TW", "zh-CN"}
@@ -279,7 +284,7 @@ func localSubtitleResolver(videoID, locationID int64, fullPath string) mpv.Subti
 			if err != nil {
 				return nil, err
 			}
-			if cfg["subtitle_auto_download"] != "true" {
+			if !subtitleAutoDownloadEnabled(cfg) {
 				file.Status = "disabled"
 			}
 			return file, nil

@@ -537,9 +537,6 @@ local function more_menu()
     if has_track("audio") then
         add("音轨…", function() mp.commandv("script-binding", "select/select-aid") end)
     end
-    if has_track("sub") or mp.get_property_native("user-data/javboss/subtitle-editable", false) then
-        add("字幕…", function() mp.commandv("script-message", "javboss-subtitle-menu") end)
-    end
     local speed = mp.get_property_number("speed", 1) or 1
     add(string.format("倍速… (%gx)", speed), speed_menu)
     local ontop = mp.get_property_native("ontop", false)

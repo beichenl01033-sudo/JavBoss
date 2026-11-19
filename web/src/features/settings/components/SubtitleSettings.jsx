@@ -3,7 +3,7 @@ import { Switch } from '@mui/material'
 import { zh } from '@/utils/i18n'
 import { getErrorMessage } from '@/utils/errors'
 
-export default function SubtitleSettings({ enabled = false, language = 'zh-CN', onSave }) {
+export default function SubtitleSettings({ enabled = true, language = 'zh-CN', onSave }) {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 

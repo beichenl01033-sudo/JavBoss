@@ -86,7 +86,7 @@ func TestBundledModernZEnablesFullscreenAutohide(t *testing.T) {
 		"playlist_mbtn_left_command=script-message-to playlist_sidebar toggle\n",
 		"highlight_mbtn_left_command=script-message-to javboss_highlight_sidebar toggle\n",
 		"audio_tracks_button=no\n",
-		"subtitles_button=no\n",
+		"subtitles_button=yes\n",
 		"speed_button=no\n",
 		"ontop_button=no\n",
 		"info_button=no\n",

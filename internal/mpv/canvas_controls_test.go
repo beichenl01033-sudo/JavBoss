@@ -22,6 +22,7 @@ func TestCanvasAndControlVisibilityLua(t *testing.T) {
 	for _, tc := range []struct{ name, harness, source, marker string }{
 		{"click", "canvas_controls.lua", "javboss_control.lua", "CANVAS_CLICK_TESTS_PASSED"},
 		{"controls", "control_visibility.lua", "modernz.lua", "CONTROL_VISIBILITY_TESTS_PASSED"},
+		{"subtitles", "subtitle_button_status.lua", "modernz.lua", "SUBTITLE_BUTTON_STATUS_TESTS_PASSED"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

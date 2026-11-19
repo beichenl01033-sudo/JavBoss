@@ -199,7 +199,7 @@ func TestAutomaticSubtitleWithMPV(t *testing.T) {
 					}
 					waitMPVTestProperty(t, s.ipcPath, "sub-delay", 30.5)
 					waitMPVTestProperty(t, s.ipcPath, "user-data/javboss/subtitle-status", "ready")
-					testMoreSubtitleMenu(t, s.ipcPath)
+					testDedicatedSubtitleButton(t, s.ipcPath)
 					testAnchoredSubtitlePopup(t, s.ipcPath)
 					testLiveSubtitleEditing(t, s.ipcPath, saved, &storedMS)
 					if err := runIPCCommand(s.ipcPath, []any{"playlist-play-index", 2}); err != nil {
