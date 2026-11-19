@@ -107,7 +107,7 @@ export default function GlobalSettings({ onToast, open, onClose }) {
         const cfg = await updateConfig({ allow_lan_access: Boolean(enabled) })
         useStore.setState({ config: cfg })
       }}
-      subtitleEnabled={configFlag(config?.subtitle_auto_download)}
+      subtitleEnabled={configFlag(config?.subtitle_auto_download, true)}
       subtitleLanguage={config?.subtitle_language || 'zh-CN'}
       onSaveSubtitleSettings={async (payload) => {
         const cfg = await updateConfig(payload)

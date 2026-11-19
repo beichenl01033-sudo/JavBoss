@@ -5,6 +5,7 @@ package mpv
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -28,9 +29,13 @@ mp.get_mouse_pos = function() return test_x, test_y end
 mp.register_script_message("test-popup-inspect", function()
     osc_init()
     local result = {open = subtitle_menu ~= nil, tooltips = user_opts.tooltip_hints, find = false, items = {}, selected = {}}
+    result.subtitle_label, result.subtitle_color, result.subtitle_detail = subtitle_button_status()
     for _, el in ipairs(elements) do
         if el.name:match("^subtitle_menu_") and el.type == "button" then result.selected[el.name] = el.selected end
-        if el.name == "sub_track" then result.anchor = el.hitbox; result.tooltip = el.tooltipF() end
+        if el.name == "sub_track" then
+            result.anchor = el.hitbox; result.tooltip = el.tooltipF()
+            result.subtitle_visible = el.visible; result.subtitle_geometry = el.layout and el.layout.geometry
+        end
         if el.name:match("^subtitle_menu_track_") then result.items[el.name] = el.content end
         if el.name == "subtitle_menu_find" then result.find = true; result.find_label = el.content end
     end
@@ -82,11 +87,6 @@ mp.register_script_message("test-popup-click", function(target)
 end)
 `)
 		}
-		if asset.source == "modernz.conf" {
-			// Personal builds keep subtitle controls in More. Exercise the
-			// optional anchored popup with its button explicitly enabled here.
-			data = append(data, []byte("\nsubtitles_button=yes\n")...)
-		}
 		if asset.source == "javboss_control.lua" || asset.source == "subtitles.lua" {
 			data = append([]byte(`local test_mp = require "mp"
 local test_input = require "mp.input"
@@ -104,7 +104,7 @@ end
 	return dir
 }
 
-func testMoreSubtitleMenu(t *testing.T, endpoint string) {
+func testDedicatedSubtitleButton(t *testing.T, endpoint string) {
 	t.Helper()
 	command := func(args ...any) {
 		t.Helper()
@@ -116,23 +116,58 @@ func testMoreSubtitleMenu(t *testing.T, endpoint string) {
 	waitMPVTestProperty(t, endpoint, "user-data/javboss-test/input-menu/prompt", "更多")
 	waitMPVTestProperty(t, endpoint, "user-data/mpv/console/open", true)
 	menu := readMPVTestProperty(t, endpoint, "user-data/javboss-test/input-menu").(map[string]any)
-	index := -1
-	for i, label := range menu["items"].([]any) {
+	for _, label := range menu["items"].([]any) {
 		if label == "字幕…" {
-			index = i
+			t.Fatal("subtitle action is still buried in More")
 		}
 	}
-	if index < 0 {
-		t.Fatal("More has no subtitle action")
-	}
-	for range index {
-		command("keypress", "DOWN")
-	}
-	command("keypress", "ENTER")
-	waitMPVTestProperty(t, endpoint, "user-data/javboss-test/input-menu/prompt", "字幕")
-	waitMPVTestProperty(t, endpoint, "user-data/mpv/console/open", true)
 	command("keypress", "ESC")
 	waitMPVTestProperty(t, endpoint, "user-data/mpv/console/open", false)
+	inspect := func(label string) map[string]any {
+		t.Helper()
+		until := time.Now().Add(3 * time.Second)
+		for time.Now().Before(until) {
+			command("script-message-to", "modernz", "test-popup-inspect")
+			time.Sleep(25 * time.Millisecond)
+			info := readMPVTestProperty(t, endpoint, "user-data/javboss-test/popup").(map[string]any)
+			if info["subtitle_visible"] == true && info["subtitle_label"] == label {
+				return info
+			}
+		}
+		t.Fatal("subtitle button did not reach " + label)
+		return nil
+	}
+	active := inspect("字幕 已启用")
+	if active["subtitle_color"] != "58D130" {
+		t.Fatal("enabled subtitle is not highlighted", active)
+	}
+	geometry := active["subtitle_geometry"]
+	for _, state := range []struct{ status, label string }{{"searching", "字幕 查找中"}, {"ready", "字幕 已启用"}} {
+		command("set_property", "user-data/javboss/subtitle-status", state.status)
+		if info := inspect(state.label); !reflect.DeepEqual(info["subtitle_geometry"], geometry) {
+			t.Fatal("subtitle status moved the button", info)
+		}
+	}
+	command("set_property", "sub-visibility", false)
+	inspect("字幕 已关闭")
+	command("set_property", "sub-visibility", true)
+	inspect("字幕 已启用")
+	command("script-message-to", "modernz", "test-popup-click", "sub_track")
+	opened := false
+	var info map[string]any
+	for until := time.Now().Add(3 * time.Second); time.Now().Before(until); {
+		command("script-message-to", "modernz", "test-popup-inspect")
+		time.Sleep(25 * time.Millisecond)
+		info = readMPVTestProperty(t, endpoint, "user-data/javboss-test/popup").(map[string]any)
+		if info["open"] == true {
+			opened = true
+			break
+		}
+	}
+	if !opened {
+		t.Fatal("independent subtitle button did not open its menu", info)
+	}
+	command("keypress", "ESC")
 }
 
 func testAnchoredSubtitlePopup(t *testing.T, endpoint string) {

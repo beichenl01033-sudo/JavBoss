@@ -84,18 +84,12 @@ local function run()
     properties["user-data/javboss/subtitle-editable"] = true
     properties["track-list"] = {}
     messages["more-menu"]()
-    local subtitle_index, speed_index
+    local speed_index
     for index, label in ipairs(selection.items) do
-        if label == "字幕…" then subtitle_index = index end
+        assert(label ~= "字幕…", "subtitle action should live on the independent button")
         if label:find("倍速",1,true) then speed_index = index end
     end
-    assert(subtitle_index and speed_index, "subtitle lookup is hidden when no subtitle track exists")
-    selection.submit(subtitle_index)
-    assert(#commands == 0, "submenu opened during the previous menu's cleanup")
-    advance(0.01)
-    assert(commands[1][1] == "script-message" and commands[1][2] == "javboss-subtitle-menu",
-        "More did not open the subtitle lookup/offset menu")
-    messages["more-menu"]()
+    assert(speed_index, "More lost its speed action")
     selection.submit(speed_index)
     advance(0.01)
     assert(selection and selection.prompt == "播放速度", "speed submenu no longer opens")
@@ -106,7 +100,7 @@ local function run()
     fake_input.terminate()
     properties["track-list"] = {{type="sub",id=1}}
     messages["more-menu"]()
-    assert(selection.items[1] == "字幕…", "existing subtitle tracks lost their menu")
+    for _, label in ipairs(selection.items) do assert(label ~= "字幕…", "subtitle action was duplicated in More") end
     fake_input.terminate()
 end
 local ok, err = pcall(run)

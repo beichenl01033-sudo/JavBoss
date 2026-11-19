@@ -3,7 +3,7 @@ import test from 'node:test'
 import { browserUnavailable, openBrowser } from '../../helpers/browser.js'
 
 test(
-  'subtitle settings sit below default player settings, default off and save language preference',
+  'subtitle settings default on, save language preference and preserve an explicit opt-out',
   { skip: browserUnavailable, timeout: 60000 },
   async (t) => {
     const { origin, command, evaluate, waitFor } = await openBrowser(t)
@@ -31,11 +31,9 @@ test(
     })()`),
       true
     )
-    assert.equal(await evaluate(`${checkbox}.checked`), false)
+    assert.equal(await evaluate(`${checkbox}.checked`), true)
     assert.equal(await evaluate(`${checkbox}.getAttribute('role')`), 'switch')
     const language = `${checkbox}.form.querySelector('select[name="language"]')`
-    assert.equal(await evaluate(`${language}.getClientRects().length`), 0)
-    await evaluate(`${checkbox}.click()`)
     await waitFor(`${language}.getClientRects().length > 0`)
     await evaluate(`{
       const checkbox = ${checkbox};

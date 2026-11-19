@@ -824,7 +824,7 @@ export default function App() {
         onSelectVideo={selectPlayerVideo}
         startTime={playerStartTime}
         resumePlayback={configFlag(config?.browser_player_resume_playback, true)}
-        subtitleEnabled={configFlag(config?.subtitle_auto_download)}
+        subtitleEnabled={configFlag(config?.subtitle_auto_download, true)}
         hotkeys={config?.player_hotkeys}
         showHotkeyHint={configFlag(config?.browser_player_show_hotkey_hint, true)}
         onClose={closePlayer}

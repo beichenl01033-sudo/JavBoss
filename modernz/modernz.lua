@@ -505,6 +505,36 @@ local locale
 local function subtitle_offset_available()
     return mp.get_property_native("user-data/javboss/subtitle-editable", false)
 end
+local function subtitle_button_status()
+    local status = mp.get_property_native("user-data/javboss/subtitle-status", "")
+    local selected
+    local has_tracks = false
+    for _, track in ipairs(mp.get_property_native("track-list", {}) or {}) do
+        if track.type == "sub" then has_tracks = true; break end
+    end
+    for _, item in ipairs(mp.get_property_native("user-data/javboss/subtitle-menu-items", {}) or {}) do
+        if item.selected then selected = item.label; break end
+    end
+    local label, color, detail = "字幕", "CDD0D7", "点击选择或查找字幕；右键设置字幕偏移"
+    if status == "searching" then
+        label, color = "字幕 查找中", "FF840A"
+        detail = selected and ("正在查找字幕；当前启用：" .. selected) or "正在查找中文字幕…"
+    elseif selected then
+        label, color, detail = "字幕 已启用", "58D130", "已启用：" .. selected
+        if status == "error" then detail = detail .. "；在线查找失败，可重新查找" end
+    elseif status == "not_found" then
+        label, color, detail = "字幕 未找到", "0A9FFF", "未找到中文字幕，点击菜单可重新查找"
+    elseif status == "error" then
+        label, color, detail = "字幕 失败", "3A45FF", "字幕查找或加载失败，点击菜单可重试"
+    elseif status == "ambiguous" then
+        label, color, detail = "字幕 无匹配", "0A9FFF", "缺少关联番号或分段视频，无法自动匹配字幕"
+    elseif has_tracks or status == "ready" or status == "existing" then
+        label, detail = "字幕 已关闭", "字幕已加载但未启用，点击菜单选择字幕"
+    elseif status == "disabled" then
+        label, detail = "字幕 手动", "自动查找已关闭，点击菜单仍可手动查找"
+    end
+    return label, color, detail
+end
 local function set_osc_locale()
     locale = language[user_opts.language] or language["default"]
 end
@@ -2665,16 +2695,17 @@ layouts["modern-compact"] = function ()
         elements[name].visible = vis
         if vis then
             lo = add_layout(name)
-            lo.geometry = {x = end_x, y = refY - (user_opts.osc_height / 2), an = 5, w = (w or 24), h = 24}
+            local button_width = w or 24
+            lo.geometry = {x = end_x - (button_width - 24) / 2, y = refY - (user_opts.osc_height / 2), an = 5, w = button_width, h = 24}
             lo.style = style or osc_styles.control_2
-            end_x = end_x - 55
+            end_x = end_x - button_width - 31
         end
     end
 
     right_side_button("menu", 250, user_opts.menu_button)
     right_side_button("fullscreen", 300, user_opts.fullscreen_button)
     right_side_button("ontop", 300, user_opts.ontop_button and not (window_controls_enabled() and user_opts.ontop_in_topbar and state.ontop))
-    right_side_button("sub_track", 400, user_opts.subtitles_button and (state.sub_track_count > 0 or subtitle_offset_available()))
+    right_side_button("sub_track", 250, user_opts.subtitles_button, osc_styles.control_text, 98)
     right_side_button("audio_track", 500, user_opts.audio_tracks_button and state.audio_track_count > 0)
     right_side_button("playlist", 600, user_opts.playlist_button)
     right_side_button("highlight", 650, user_opts.highlight_button, osc_styles.control_text)
@@ -3133,9 +3164,13 @@ local function osc_init()
     --sub_track
     ne = new_element("sub_track", "button")
     ne.enabled = state.sub_track_count > 0 or subtitle_offset_available()
-    ne.off = state.sub_track_count == 0 or not mp.get_property_native("sid")
-    ne.content = icons.subtitle
-    ne.tooltipF = function () return track_tooltip(locale.subtitle, "sub", "sid", state.sub_track_count) end
+    ne.off = false
+    ne.content = function()
+        local label, color = subtitle_button_status()
+        if user_opts.layout ~= "modern-compact" then label = icons.subtitle end
+        return "{\\fs17\\1c&H" .. color .. "&}" .. label
+    end
+    ne.tooltipF = function () local _, _, detail = subtitle_button_status(); return detail end
     ne.nothingavailable = locale.no_subs
     bind_buttons("sub_track")
 
@@ -4006,6 +4041,7 @@ observe_cached("playlist-count", request_init)
 observe_cached("playlist-pos", request_init)
 mp.observe_property("user-data/javboss/subtitle-editable", "bool", request_init_resize)
 mp.observe_property("user-data/javboss/subtitle-menu-items", "native", request_init_resize)
+mp.observe_property("user-data/javboss/subtitle-status", "string", request_init)
 observe_cached("chapter-list", function ()
     state.chapter_list = state.chapter_list or {}
     table.sort(state.chapter_list, function(a, b) return a.time < b.time end)
