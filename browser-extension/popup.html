@@ -39,10 +39,26 @@
         <label class="toggle section-toggle" for="ownership-enabled">
           <span>
             <strong>显示已拥有状态</strong>
-            <small>在 JavDB、JavBus、JavLibrary 展示影片库拥有标记</small>
+            <small
+              >在 JavDB、JavBus、JavLibrary 展示拥有标记；LTX 资源库区分 LTX
+              已有 / 影片已有</small
+            >
           </span>
           <input id="ownership-enabled" type="checkbox" disabled />
         </label>
+      </section>
+      <section class="settings-section" aria-label="LTX 目录同步">
+        <strong>LTX 目录同步</strong>
+        <p>
+          配置连接后，在新站首页展开左下角“JavBoss · LTX
+          目录同步”，可同步、暂停及继续。只读取番号与状态，不下载视频。
+        </p>
+        <a
+          href="https://ltxlib.dpdns.org/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >打开 LTX 资源库</a
+        >
       </section>
       <section class="settings-section" aria-label="JavDB">
         <label class="toggle section-toggle" for="javdb-auto-redirect">

@@ -7,6 +7,7 @@ const SCRAPE_ORIGINS = new Set([
   "https://avsox.click",
 ]);
 const OWNERSHIP_ORIGINS = new Set([
+  "https://ltxlib.dpdns.org",
   "https://javdb.com",
   "https://www.javbus.com",
   "https://www.javlibrary.com",
@@ -201,7 +202,10 @@ async function lookupJavOwnership(message, sender) {
           typeof item?.code === "string" &&
           typeof item?.owned === "boolean"
         ) {
-          statuses.set(item.code, item.owned);
+          statuses.set(item.code, {
+            owned: item.owned,
+            ltx: item.owned && item.ltx === true,
+          });
         }
       }
     }
@@ -212,7 +216,8 @@ async function lookupJavOwnership(message, sender) {
       ok: true,
       items: [...new Set(codes)].map((code) => ({
         code,
-        owned: statuses.get(code),
+        owned: statuses.get(code).owned,
+        ...(statuses.get(code).ltx ? { ltx: true } : {}),
       })),
     };
   } catch {
@@ -277,6 +282,125 @@ async function submitMagnetDownload(message) {
     };
   }
   return { ok: true };
+}
+
+// Only the isolated content script on LTX can submit public catalogue data.
+// Tokens stay in the worker; no website is granted CORS access to JavBoss.
+async function ltxCatalogOperation(message, sender) {
+  let origin;
+  try {
+    origin = new URL(sender.url).origin;
+  } catch {
+    origin = "";
+  }
+  if (
+    origin !== "https://ltxlib.dpdns.org" ||
+    !Number.isInteger(sender.tab?.id) ||
+    sender.frameId > 0
+  ) {
+    return { ok: false, error: "invalid LTX sync origin" };
+  }
+  await requirePrivateStorage();
+  const stored = await JavBossSettings.get(CONNECTION_SETTINGS_KEY);
+  const connection = stored[CONNECTION_SETTINGS_KEY];
+  const serverUrl = normalizedServerURL(connection?.serverUrl);
+  const token = String(connection?.apiToken || "").trim();
+  if (!serverUrl || !/^jbe_[A-Za-z0-9_-]{43}$/.test(token)) {
+    return {
+      ok: false,
+      error: "请先在 JavBoss 助手中配置 Server 地址和 API 令牌",
+    };
+  }
+  const key = "javboss:ltx-catalog-checkpoint";
+  const cached = (await JavBossSettings.get(key))[key];
+  const checkpoint =
+    cached?.serverUrl === serverUrl && cached.expiresAt > Date.now()
+      ? cached.payload
+      : null;
+  if (message.action === "load") return { ok: true, checkpoint };
+  if (message.action === "clear") {
+    await JavBossSettings.set({ [key]: null });
+    return { ok: true };
+  }
+  const payload = message.payload;
+  if (
+    !payload ||
+    !Array.isArray(payload.items) ||
+    payload.items.length > 20000 ||
+    JSON.stringify(payload).length > 4 * 1024 * 1024 ||
+    payload.items.some(
+      (item) =>
+        typeof item?.code !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9 ._-]{0,127}$/.test(item.code) ||
+        typeof item.pending !== "boolean",
+    )
+  ) {
+    return { ok: false, error: "LTX 同步数据格式无效" };
+  }
+  if (message.action === "checkpoint") {
+    await JavBossSettings.set({
+      [key]: {
+        serverUrl,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+        payload,
+      },
+    });
+    return { ok: true };
+  }
+  if (message.action !== "commit")
+    return { ok: false, error: "invalid LTX sync action" };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(
+      new URL("extension/ltx/catalog", `${serverUrl}/`).href,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "omit",
+        redirect: "error",
+        signal: controller.signal,
+        body: JSON.stringify({
+          source: origin,
+          complete: true,
+          total: payload.total,
+          confirmed: payload.confirmed,
+          pending: payload.pending,
+          items: payload.items.map((item) => ({
+            code: item.code,
+            pending: item.pending,
+          })),
+        }),
+      },
+    );
+    if (!response.ok)
+      return {
+        ok: false,
+        error: `保存 LTX 目录失败（HTTP ${response.status}），检查 JavBoss 版本、连接与令牌后重试；旧缓存未替换`,
+      };
+    const result = await response.json();
+    if (
+      result.total !== payload.total ||
+      !Number.isFinite(Date.parse(result.updated_at))
+    ) {
+      return {
+        ok: false,
+        error: "LTX 保存响应无效，检查点已保留，请确认后端已更新",
+      };
+    }
+    await JavBossSettings.set({ [key]: null });
+    return { ok: true, total: result.total, updatedAt: result.updated_at };
+  } catch {
+    return {
+      ok: false,
+      error: "无法保存 LTX 目录，检查点已保留，请检查连接后继续同步",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function validJavDBAssistRequest(value) {
@@ -545,6 +669,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     operation = submitMagnetDownload(message);
   } else if (message?.type === "JAVBOSS_JAV_OWNERSHIP") {
     operation = lookupJavOwnership(message, sender);
+  } else if (message?.type === "JAVBOSS_LTX_CATALOG") {
+    operation = ltxCatalogOperation(message, sender);
   } else {
     return false;
   }

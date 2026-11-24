@@ -24,6 +24,17 @@
   color: #166534 !important;
 }
 
+article.card > .javboss-ownership[data-javboss-ownership="owned"] {
+  border-color: #fcd34d !important;
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+.javboss-ownership[data-javboss-ownership="ltx"] {
+  border-color: #86efac !important;
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+
 .javboss-ownership-cover {
   position: relative !important;
 }

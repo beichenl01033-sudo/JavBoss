@@ -1,0 +1,36 @@
+.javboss-ltx-sync {
+  position: fixed !important;
+  bottom: 16px !important;
+  left: 16px !important;
+  z-index: 10000 !important;
+  width: min(320px, calc(100vw - 32px)) !important;
+  padding: 12px !important;
+  border: 1px solid #64748b !important;
+  border-radius: 10px !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+  box-shadow: 0 4px 16px #0004 !important;
+  font:
+    12px/1.5 system-ui,
+    sans-serif !important;
+}
+.javboss-ltx-sync p {
+  margin: 6px 0 !important;
+}
+.javboss-ltx-sync summary {
+  cursor: pointer !important;
+  font-weight: 600 !important;
+}
+.javboss-ltx-sync button {
+  margin: 4px 4px 0 0 !important;
+  padding: 4px 8px !important;
+  border: 1px solid #64748b !important;
+  border-radius: 5px !important;
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  cursor: pointer !important;
+}
+.javboss-ltx-sync button:disabled {
+  opacity: 0.5 !important;
+  cursor: default !important;
+}

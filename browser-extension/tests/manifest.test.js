@@ -72,6 +72,7 @@ test("bridge resources are web accessible without broad host permissions", () =>
     "https://www.javlibrary.com/*",
     "https://javdb.com/*",
     "https://avsox.click/*",
+    "https://ltxlib.dpdns.org/*",
   ]);
   assert.deepEqual(manifest.optional_host_permissions, [
     "http://*/*",
@@ -119,6 +120,7 @@ test("bridge resources are web accessible without broad host permissions", () =>
     "https://javdb.com/*",
     "https://www.javbus.com/*",
     "https://www.javlibrary.com/*",
+    "https://ltxlib.dpdns.org/*",
   ]);
   assert.equal(ownership.run_at, "document_idle");
   assert.notEqual(ownership.all_frames, true);
