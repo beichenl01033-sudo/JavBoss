@@ -172,11 +172,17 @@ export async function resetVideoCover(videoId) {
   return res.json()
 }
 
-export async function renameVideoLocation(videoId, locationId, filename) {
-  const res = await apiFetch(`/videos/${videoId}/locations/${locationId}`, {
+export async function renameVideoLocation(videoId, locationId, filename, options = {}) {
+  // A dedicated route fails closed against an older backend that would ignore
+  // the LTX option and rename only the video, leaving its sidecars behind.
+  const suffix = typeof options.ltx === 'boolean' ? '/ltx' : ''
+  const res = await apiFetch(`/videos/${videoId}/locations/${locationId}${suffix}`, {
     method: 'PATCH',
     headers: jsonHeaders,
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({
+      filename,
+      ...(typeof options.ltx === 'boolean' ? { ltx: options.ltx } : {}),
+    }),
   })
   if (!res.ok) {
     throw await apiError(res)

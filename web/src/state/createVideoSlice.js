@@ -81,6 +81,7 @@ export function createVideoSlice({ set, get, lists }) {
     randomMode: false,
     randomSeed: null,
     videos: [],
+    videoLocationUpdates: {},
     loading: false,
     videoLoadingMore: false,
     error: null,

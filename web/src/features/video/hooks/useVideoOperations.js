@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react'
 import { zh } from '@/utils/i18n'
 import { renameVideoLocation, deleteVideoLocation } from '@/features/video/api'
 import { getErrorMessage } from '@/utils/errors'
+import { suggestLtxFilename } from '@/features/ltx/model'
 import {
   updateVideoJavScrapeSettings,
   fetchVideoJavScrapePossibleCodes,
@@ -17,7 +18,7 @@ export default function useVideoOperations({ showCenterToast, showToast }) {
   const [scrapeSettingsSaving, setScrapeSettingsSaving] = useState(false)
 
   const handleRenameVideo = useCallback(
-    async (video) => {
+    async (video, options = {}) => {
       const locationId = Number(video?.location_id)
       if (!video?.id || !Number.isFinite(locationId) || locationId <= 0) {
         showCenterToast(zh('无法重命名：缺少文件位置', 'Cannot rename: missing file location'))
@@ -31,12 +32,46 @@ export default function useVideoOperations({ showCenterToast, showToast }) {
         String(video?.path || '')
           .split(/[\\/]/)
           .pop()
-      const nextName = window.prompt(zh('重命名视频文件', 'Rename video file'), currentName)
+      const isLtxAction = typeof options.ltx === 'boolean'
+      let defaultName = currentName
+      if (isLtxAction) {
+        let code = String(video?.jav?.code || video?.locations?.[0]?.jav?.code || '').trim()
+        if (options.ltx && !code) {
+          showCenterToast(
+            zh(
+              '请先在刮削设置中关联影片番号，再标记为 LTX',
+              'Link a movie code in scrape settings before marking LTX'
+            )
+          )
+          setScrapeSettingsVideo(video)
+          return
+        }
+        try {
+          defaultName = suggestLtxFilename(currentName, code, options.ltx)
+        } catch (err) {
+          showCenterToast(getErrorMessage(err))
+          return
+        }
+      }
+      const nextName = window.prompt(
+        isLtxAction
+          ? zh(
+              `${options.ltx ? '标记为 LTX' : '取消 LTX 标记'}：将实际重命名文件及同名字幕/NFO/封面。\n原文件：${currentName}\n请确认新文件名（同名文件不会覆盖）：`,
+              `Rename video and matching sidecars.\nOriginal: ${currentName}\nConfirm the new filename (no overwrites):`
+            )
+          : zh('重命名视频文件', 'Rename video file'),
+        defaultName
+      )
       if (nextName == null) return
       const filename = nextName.trim()
       if (!filename || filename === currentName) return
       try {
-        const updated = await renameVideoLocation(video.id, locationId, filename)
+        const updated = await renameVideoLocation(video.id, locationId, filename, options)
+        const pathUpdate = {
+          path: updated.path,
+          filename: updated.filename,
+          modified_at: updated.modified_at,
+        }
         useStore.setState((state) => {
           const targetKey = videoSelectionKey(video)
           const nextVideos = Array.isArray(state.videos)
@@ -51,7 +86,17 @@ export default function useVideoOperations({ showCenterToast, showToast }) {
               label: updated.filename || updated.path || nextMeta[targetKey].label,
             }
           }
-          return { videos: nextVideos, selectedVideoMeta: nextMeta }
+          return {
+            videos: nextVideos,
+            selectedVideoMeta: nextMeta,
+            videoLocationUpdates: { ...state.videoLocationUpdates, [targetKey]: pathUpdate },
+            javItems: state.javItems?.map((item) => ({
+              ...item,
+              videos: item.videos?.map((entry) =>
+                videoSelectionKey(entry) === targetKey ? { ...entry, ...pathUpdate } : entry
+              ),
+            })),
+          }
         })
       } catch (err) {
         console.error(zh('重命名视频失败', 'Failed to rename video'), err)

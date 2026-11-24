@@ -35,9 +35,13 @@ function createHarness({
     const related = typeof input === "object" && input.related;
     const entry = {
       badges: [],
-      classList: { contains: () => false },
       getAttribute: () =>
-        typeof input === "object" && input.href ? input.href : `/en/${code}`,
+        site === "ltxlib"
+          ? entry.code.textContent
+          : typeof input === "object" && input.href
+            ? input.href
+            : `/en/${code}`,
+      classList: { add() {}, contains: () => false },
       querySelector(selector) {
         if (selector === ".cover" || selector === ".photo-frame")
           return this.cover;
@@ -93,9 +97,12 @@ function createHarness({
       if (selector === "[data-javboss-ownership]")
         return [...entries, ...blocks].flatMap((entry) => entry.badges);
       if (
-        [".movie-list .item", "a.movie-box", ".videothumblist .video"].includes(
-          selector,
-        )
+        [
+          ".movie-list .item",
+          "a.movie-box",
+          ".videothumblist .video",
+          "article.card[data-code]",
+        ].includes(selector)
       )
         return entries;
       if (
@@ -146,8 +153,14 @@ function createHarness({
   };
   const window = {
     location: {
-      origin: `https://${site === "javdb" ? site : "www." + site}.com`,
-      href: `https://${site === "javdb" ? site : "www." + site}.com/`,
+      origin:
+        site === "ltxlib"
+          ? "https://ltxlib.dpdns.org"
+          : `https://${site === "javdb" ? site : "www." + site}.com`,
+      href:
+        site === "ltxlib"
+          ? "https://ltxlib.dpdns.org/"
+          : `https://${site === "javdb" ? site : "www." + site}.com/`,
     },
     setTimeout(callback) {
       timers.set(++nextTimer, callback);
@@ -253,6 +266,34 @@ test("JavDB marks list covers and detail codes once, sharing a batch for duplica
   assert.equal(h.calls.length, 1);
   assert.equal(h.entries[0].badges.length, 1);
   assert.equal(h.entries[0].code.textContent, "ABC-123");
+});
+
+test("LTX site distinguishes LTX owned from movie owned and updates a reused badge", async () => {
+  const h = createHarness({
+    site: "ltxlib",
+    list: ["ABC-123", "DEF-456", "GHI-789"],
+    respond: (codes) => ({
+      ok: true,
+      items: codes.map((code) => ({
+        code,
+        owned: code !== "GHI-789",
+        ltx: code === "ABC-123",
+      })),
+    }),
+  });
+  await h.flush();
+  assert.equal(h.entries[0].badges[0].textContent, "LTX 已有");
+  assert.equal(h.entries[0].badges[0].dataset.javbossOwnership, "ltx");
+  assert.equal(h.entries[1].badges[0].textContent, "影片已有");
+  assert.equal(h.entries[2].badges.length, 0);
+  h.respond((codes) => ({
+    ok: true,
+    items: codes.map((code) => ({ code, owned: true, ltx: false })),
+  }));
+  h.refresh();
+  await h.flush();
+  assert.equal(h.entries[0].badges.length, 1);
+  assert.equal(h.entries[0].badges[0].textContent, "影片已有");
 });
 
 test("JavDB queries dynamically inserted cards and changed codes without losing cached results", async () => {

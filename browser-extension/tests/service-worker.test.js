@@ -67,6 +67,10 @@ function createHarness(options = {}) {
   };
 
   const localStorage = {
+    async set(values) {
+      for (const [key, value] of Object.entries(values))
+        settingsData.set(key, value);
+    },
     async get(keys) {
       const requested = Array.isArray(keys) ? keys : [keys];
       return Object.fromEntries(
@@ -135,6 +139,7 @@ function createHarness(options = {}) {
     JavBossSettings: {
       ready: Promise.resolve(!options.privateStorageFailure),
       get: localStorage.get,
+      set: localStorage.set,
     },
     fetch,
     URL,
@@ -166,6 +171,113 @@ function createHarness(options = {}) {
     updatedTabs,
   };
 }
+
+test("LTX ownership uses filename status without exposing credentials", async () => {
+  const h = createHarness({
+    connectionSettings: {
+      serverUrl: "http://127.0.0.1:17654",
+      apiToken: TEST_TOKEN,
+    },
+    responsePayload: { items: [{ code: "ABC-123", owned: true, ltx: true }] },
+  });
+  assert.deepEqual(
+    plain(
+      await h.send(
+        { type: "JAVBOSS_JAV_OWNERSHIP", codes: ["ABC-123"] },
+        { id: 2, url: "https://ltxlib.dpdns.org/" },
+      ),
+    ),
+    { ok: true, items: [{ code: "ABC-123", owned: true, ltx: true }] },
+  );
+});
+
+test("LTX sync checkpoints bind to the configured server and commits only public fields", async () => {
+  const h = createHarness({
+    connectionSettings: {
+      serverUrl: "http://127.0.0.1:17654",
+      apiToken: TEST_TOKEN,
+    },
+    responsePayload: { total: 1, updated_at: "2026-11-24T00:00:00Z" },
+  });
+  const sender = { id: 3, url: "https://ltxlib.dpdns.org/" };
+  const payload = {
+    total: 1,
+    confirmed: 1,
+    pending: 0,
+    page: 1,
+    items: [{ code: "ABC-123", pending: false }],
+  };
+  const send = (action, extra = {}) =>
+    h.send({ type: "JAVBOSS_LTX_CATALOG", action, ...extra }, sender);
+  assert.equal((await send("checkpoint", { payload })).ok, true);
+  assert.deepEqual(plain((await send("load")).checkpoint), payload);
+  assert.equal(h.fetchCalls.length, 0);
+  const result = await send("commit", { payload });
+  assert.equal(result.ok, true);
+  assert.equal((await send("load")).checkpoint, null);
+  assert.equal(
+    h.fetchCalls[0].url,
+    "http://127.0.0.1:17654/extension/ltx/catalog",
+  );
+  assert.deepEqual(JSON.parse(h.fetchCalls[0].options.body), {
+    source: "https://ltxlib.dpdns.org",
+    complete: true,
+    total: 1,
+    confirmed: 1,
+    pending: 0,
+    items: payload.items,
+  });
+  assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
+  const blocked = await h.send(
+    { type: "JAVBOSS_LTX_CATALOG", action: "commit", payload },
+    { id: 4, url: "https://evil.test/" },
+  );
+  assert.equal(blocked.ok, false);
+  assert.equal(h.fetchCalls.length, 1);
+});
+
+test("failed LTX uploads retain the checkpoint and messages cannot choose a destination", async () => {
+  const h = createHarness({
+    connectionSettings: {
+      serverUrl: "http://127.0.0.1:17654",
+      apiToken: TEST_TOKEN,
+    },
+    responseStatus: 403,
+  });
+  const sender = { id: 3, url: "https://ltxlib.dpdns.org/" };
+  const payload = {
+    total: 1,
+    confirmed: 1,
+    pending: 0,
+    page: 1,
+    items: [{ code: "ABC-123", pending: false }],
+  };
+  await h.send(
+    { type: "JAVBOSS_LTX_CATALOG", action: "checkpoint", payload },
+    sender,
+  );
+  const result = await h.send(
+    {
+      type: "JAVBOSS_LTX_CATALOG",
+      action: "commit",
+      serverUrl: "https://evil.test",
+      payload,
+    },
+    sender,
+  );
+  assert.equal(result.ok, false);
+  assert.equal(
+    h.fetchCalls[0].url,
+    "http://127.0.0.1:17654/extension/ltx/catalog",
+  );
+  assert.deepEqual(
+    plain(
+      (await h.send({ type: "JAVBOSS_LTX_CATALOG", action: "load" }, sender))
+        .checkpoint,
+    ),
+    payload,
+  );
+});
 
 test("a clicked magnet link is submitted to the configured JavBoss server", async () => {
   const harness = createHarness({
@@ -771,6 +883,7 @@ test("ownership accepts JavBus and JavLibrary and refreshes all supported sites"
   harness.listeners.storage({ "javboss:connection-changed": {} }, "local");
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(plain(harness.tabQueries.find((query) => query.url)?.url), [
+    "https://ltxlib.dpdns.org/*",
     "https://javdb.com/*",
     "https://www.javbus.com/*",
     "https://www.javlibrary.com/*",
@@ -835,6 +948,7 @@ test("disabled ownership skips server requests and broadcasts only the preferenc
     },
   ]);
   assert.deepEqual(plain(harness.tabQueries[0].url), [
+    "https://ltxlib.dpdns.org/*",
     "https://javdb.com/*",
     "https://www.javbus.com/*",
     "https://www.javlibrary.com/*",

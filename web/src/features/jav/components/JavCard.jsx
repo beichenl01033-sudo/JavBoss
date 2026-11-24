@@ -28,6 +28,7 @@ import VideoLibraryOutlinedIcon from '@mui/icons-material/VideoLibraryOutlined'
 import { JavItemEditors } from '@/features/jav/components/JavItemEditors'
 import WatchTimeIcons from '@/features/playback/components/WatchTimeIcons'
 import HighlightBadge from '@/features/highlights/components/HighlightBadge'
+import LtxBadges from '@/features/ltx/components/LtxBadges'
 
 export default function JavCard(props) {
   const { portrait = false, highSaturationTags = true } = props
@@ -172,6 +173,11 @@ export default function JavCard(props) {
           style={{ aspectRatio: portrait ? `100 / ${coverAspectPercent}` : '800 / 538' }}
         >
           <HighlightBadge videos={item?.videos || []} className="absolute bottom-12 left-2 z-10" />
+          <LtxBadges
+            code={item?.code}
+            videos={item?.videos || []}
+            className="absolute right-2 top-10 z-20"
+          />
           {cover ? (
             <JavCoverImage
               src={cover}

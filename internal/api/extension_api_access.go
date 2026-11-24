@@ -12,6 +12,7 @@ var extensionTokenAPIs = map[string]map[string]bool{
 	"/extension/downloads":     {http.MethodPost: true},
 	"/extension/status":        {http.MethodGet: true},
 	"/extension/jav/ownership": {http.MethodPost: true},
+	"/extension/ltx/catalog":   {http.MethodPost: true},
 }
 
 func extensionTokenAPIAllowed(method, path string) bool {

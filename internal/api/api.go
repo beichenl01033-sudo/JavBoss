@@ -10,6 +10,7 @@ import (
 
 // RegisterRoutes wires handlers onto the provided router.
 func RegisterRoutes(router gin.IRoutes) {
+	router.GET("/ltx/catalog", getLtxCatalog)
 	// Update status/check/install have no query parameters. Installation uses the
 	// official release selected by the server and requires normal session auth.
 	for _, route := range []struct{ method, path string }{
@@ -61,6 +62,7 @@ func RegisterRoutes(router gin.IRoutes) {
 	router.POST("/videos/:id/jav-scrape/manual", manualVideoJavScrape)
 	router.DELETE("/videos/:id/screenshots/:name", deleteVideoScreenshot)
 	router.PATCH("/videos/:id/locations/:location_id", renameVideoLocation)
+	router.PATCH("/videos/:id/locations/:location_id/ltx", renameVideoLocation)
 	router.DELETE("/videos/:id/locations/:location_id", deleteVideoLocation)
 	router.POST("/videos/:id/play", incrementVideoPlayCount)
 	router.POST("/videos/:id/playback-sessions", createPlaybackSession)

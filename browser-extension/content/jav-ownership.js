@@ -3,6 +3,7 @@
     "https://javdb.com": javDBTargets,
     "https://www.javbus.com": javBusTargets,
     "https://www.javlibrary.com": javLibraryTargets,
+    "https://ltxlib.dpdns.org": ltxTargets,
   }[window.location.origin];
   if (window.top !== window || !collect) return;
 
@@ -13,6 +14,15 @@
   let timer;
   let lastRefresh = Date.now();
   let enabled = true;
+
+  function ltxTargets() {
+    return Array.from(document.querySelectorAll("article.card[data-code]")).map(
+      (item) => {
+        item.classList.add("javboss-ownership-cover");
+        return { host: item, code: item.getAttribute("data-code") || "" };
+      },
+    );
+  }
 
   function javDBTargets() {
     const result = [];
@@ -127,7 +137,21 @@
     }
     // Keep confirmed badges while revalidating, including on temporary failures.
     if (!enabled || result?.ok !== true || result.owned !== true) return;
-    if (badge) return;
+    const ltxSite = window.location.origin === "https://ltxlib.dpdns.org";
+    const label = ltxSite ? (result.ltx ? "LTX 已有" : "影片已有") : "已拥有";
+    const title = ltxSite
+      ? result.ltx
+        ? "JavBoss 中同番号文件名含 LTX 标记；并非文件校验匹配"
+        : "JavBoss 中已有同番号影片，LTX 版本未确认"
+      : "JavBoss 影片库中已有此番号的有效视频记录";
+    if (badge) {
+      if (badge.textContent !== label) badge.textContent = label;
+      if (badge.title !== title) badge.title = title;
+      const state = result.ltx && ltxSite ? "ltx" : "owned";
+      if (badge.dataset.javbossOwnership !== state)
+        badge.dataset.javbossOwnership = state;
+      return;
+    }
 
     // Keep JavBus thumbnail cropping inside the overflowing badge container.
     if (cropImage?.parentElement === host) {
@@ -139,10 +163,11 @@
 
     const ownedBadge = document.createElement("span");
     ownedBadge.className = "javboss-ownership";
-    ownedBadge.dataset.javbossOwnership = "owned";
+    ownedBadge.dataset.javbossOwnership =
+      result.ltx && ltxSite ? "ltx" : "owned";
     ownedBadge.dataset.javbossOwnershipCode = code;
-    ownedBadge.textContent = "已拥有";
-    ownedBadge.title = "JavBoss 影片库中已有此番号的有效视频记录";
+    ownedBadge.textContent = label;
+    ownedBadge.title = title;
     if (cell) {
       const column = document.createElement("td");
       column.className = "javboss-ownership-cell";
@@ -190,13 +215,16 @@
           (response?.ok && Array.isArray(response.items)
             ? response.items
             : []
-          ).map((item) => [item?.code, item?.owned]),
+          ).map((item) => [
+            item?.code,
+            { owned: item?.owned, ltx: item?.ltx === true },
+          ]),
         );
         for (const code of batch) {
           cache.set(
             code,
-            response?.ok && typeof items.get(code) === "boolean"
-              ? { ok: true, owned: items.get(code) }
+            response?.ok && typeof items.get(code)?.owned === "boolean"
+              ? { ok: true, ...items.get(code) }
               : { ok: false, error: response?.error || "拥有状态响应无效" },
           );
         }

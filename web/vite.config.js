@@ -26,6 +26,7 @@ export default defineConfig({
       '/downloads': backendProxy(),
       '/clips': backendProxy(),
       '/extension': backendProxy(),
+      '/ltx': backendProxy(),
       '/jav': backendProxy(),
       '/config': backendProxy(),
       '/tools': backendProxy(),

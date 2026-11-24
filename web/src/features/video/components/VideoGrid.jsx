@@ -17,6 +17,7 @@ export default function VideoGrid({
   onRenameVideo,
   onDeleteVideo,
   onTagClick,
+  javCode,
 }) {
   return (
     <div
@@ -26,7 +27,7 @@ export default function VideoGrid({
       {videos.map((v) => (
         <VideoCard
           key={videoSelectionKey(v)}
-          video={v}
+          video={javCode && !v.jav ? { ...v, jav: { code: javCode } } : v}
           checked={selectedIds.has(videoSelectionKey(v))}
           onToggle={() => onToggleSelect(v)}
           showSelection={showSelection}

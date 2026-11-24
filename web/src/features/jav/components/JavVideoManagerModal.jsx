@@ -70,6 +70,7 @@ export function JavVideoManagerModal({
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {videos.length > 0 ? (
           <VideoGrid
+            javCode={item?.code}
             videos={videos}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelectVideo}

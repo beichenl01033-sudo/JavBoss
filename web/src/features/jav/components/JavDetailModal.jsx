@@ -897,6 +897,7 @@ export default function JavDetailModal({
             </div>
             {videos.length > 0 ? (
               <VideoGrid
+                javCode={code}
                 videos={videos}
                 selectedIds={emptyVideoSelection}
                 onToggleSelect={() => {}}

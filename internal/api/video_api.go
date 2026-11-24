@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,7 @@ import (
 	"javboss/internal/mpv"
 	"javboss/internal/util"
 	"javboss/internal/video/highlights"
+	"javboss/internal/video/ltx"
 	"javboss/internal/video/metadata"
 	"javboss/internal/video/screenshot"
 	"javboss/internal/video/stream"
@@ -147,6 +149,7 @@ type videoCoverRequest struct {
 
 type renameVideoLocationRequest struct {
 	Filename string `json:"filename"`
+	LTX      *bool  `json:"ltx"`
 }
 
 type videoJavScrapeSettingsRequest struct {
@@ -737,7 +740,13 @@ func revealVideoLocation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+var videoRenameMu sync.Mutex
+
+// The LTX subroute renames matching sidecars as one rollback-capable operation;
+// it keeps the existing video/location IDs rather than rescanning a new entity.
 func renameVideoLocation(c *gin.Context) {
+	videoRenameMu.Lock()
+	defer videoRenameMu.Unlock()
 	videoID, locationID, ok := parseVideoLocationParams(c)
 	if !ok {
 		return
@@ -749,8 +758,16 @@ func renameVideoLocation(c *gin.Context) {
 		return
 	}
 	filename := strings.TrimSpace(req.Filename)
+	if strings.HasSuffix(c.FullPath(), "/ltx") && req.LTX == nil {
+		respondLocalizedError(c, http.StatusBadRequest, "请指定 LTX 标记操作", "Specify the LTX labelling operation")
+		return
+	}
 	if !isSafeVideoFilename(filename) {
 		respondLocalizedError(c, http.StatusBadRequest, "文件名无效", "Invalid filename")
+		return
+	}
+	if req.LTX != nil && ltx.Marked(filename) != *req.LTX {
+		respondLocalizedError(c, http.StatusBadRequest, "文件名的 LTX 标记与操作不一致", "Filename LTX label does not match the operation")
 		return
 	}
 
@@ -766,6 +783,10 @@ func renameVideoLocation(c *gin.Context) {
 	}
 
 	currentRel := filepath.ToSlash(filepath.Clean(filepath.FromSlash(loc.RelativePath)))
+	if req.LTX != nil && !strings.EqualFold(filepath.Ext(currentRel), filepath.Ext(filename)) {
+		respondLocalizedError(c, http.StatusBadRequest, "LTX 标记不能改变视频扩展名", "LTX labelling cannot change the video extension")
+		return
+	}
 	parentRel := filepath.ToSlash(filepath.Dir(filepath.FromSlash(currentRel)))
 	nextRel := filename
 	if parentRel != "." && parentRel != "" {
@@ -837,8 +858,23 @@ func renameVideoLocation(c *gin.Context) {
 		return
 	}
 
-	if err := os.Rename(oldFullPath, newFullPath); err != nil {
+	var undoRename func() error
+	if req.LTX != nil {
+		undoRename, err = ltx.RenameFamily(oldFullPath, newFullPath)
+	} else {
+		err = os.Rename(oldFullPath, newFullPath)
+		undoRename = func() error { return os.Rename(newFullPath, oldFullPath) }
+	}
+	if err != nil {
 		logging.Error("rename video file error: %v", err)
+		if errors.Is(err, ltx.ErrSharedSidecars) {
+			respondLocalizedError(c, http.StatusConflict, "存在同名的其他视频，字幕等关联文件可能共用，请先手动区分文件名", "Other same-stem videos may share sidecars; distinguish their filenames before labelling")
+			return
+		}
+		if errors.Is(err, os.ErrExist) {
+			respondLocalizedError(c, http.StatusConflict, "目标视频或关联文件已存在，不会覆盖", "Target video or sidecar already exists; nothing overwritten")
+			return
+		}
 		respondLocalizedError(c, http.StatusInternalServerError, "重命名视频文件失败", "Failed to rename video file")
 		return
 	}
@@ -847,7 +883,7 @@ func renameVideoLocation(c *gin.Context) {
 		modifiedAt = renamedInfo.ModTime()
 	}
 	if _, err := dbpkg.Default().UpdateVideoLocationPath(c.Request.Context(), locationID, nextRel, modifiedAt); err != nil {
-		if rollbackErr := os.Rename(newFullPath, oldFullPath); rollbackErr != nil {
+		if rollbackErr := undoRename(); rollbackErr != nil {
 			logging.Error("rollback video file rename failed: %v", rollbackErr)
 		}
 		if errors.Is(err, dbpkg.ErrVideoLocationPathConflict) {
