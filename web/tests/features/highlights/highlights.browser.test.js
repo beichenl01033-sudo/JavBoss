@@ -113,7 +113,11 @@ test(
     await waitFor(`location.search.includes('view=jav') && document.querySelector('.jav-card')`)
     assert.equal(new URLSearchParams(await evaluate('location.search')).get('highlight_only'), '1')
     await reloadPage()
-    await waitFor(`window.testStore && !window.testStore.getState().javLoading`)
+    // The store exists before auth/config and URL hydration complete. Its
+    // initial javLoading=false is not evidence that the restored view is ready.
+    await waitFor(
+      `window.testStore && window.testStore.getState().viewMode==='jav' && !window.testStore.getState().javLoading && document.querySelector('.jav-card')`
+    )
     assert.equal(await evaluate('window.testStore.getState().highlightOnly'), true)
     assert.deepEqual(await evaluate('window.appErrors'), [])
   }
