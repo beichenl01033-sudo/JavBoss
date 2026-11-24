@@ -7,6 +7,7 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 
 import ExtensionTokenSettings from '@/features/auth/components/ExtensionTokenSettings'
+import LtxCatalogSettings from '@/features/ltx/components/LtxCatalogSettings'
 import DirectoryManager from '@/features/directories/components/DirectoryManager'
 import AppModal from '@/shared/ui/AppModal'
 import PlayerSettingsModal from '@/features/settings/components/PlayerSettingsModal'
@@ -1606,6 +1607,7 @@ export default function GlobalSettingsModal({
           {currentSection === 'security' && (
             <div className="space-y-6">
               <ExtensionTokenSettings onToast={onToast} />
+              <LtxCatalogSettings />
               {renderAccountPanel()}
             </div>
           )}

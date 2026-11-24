@@ -8,7 +8,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import ManageSearchIcon from '@mui/icons-material/ManageSearch'
 import { revealVideoLocation } from '@/features/video/api'
-import { useStore } from '@/store'
+import { useStore, videoSelectionKey } from '@/store'
 import { buildVideoQueryLink } from '@/navigation/queryLinks'
 import { displayHostPath, hostPathsEnabled } from '@/utils/hostPath'
 import {
@@ -23,12 +23,14 @@ import { MovieEdit } from '@mui/icons-material'
 import WatchTimeIcons from '@/features/playback/components/WatchTimeIcons'
 import VideoThumbnail from '@/features/video/components/VideoThumbnail'
 import HighlightBadge from '@/features/highlights/components/HighlightBadge'
+import LtxBadges from '@/features/ltx/components/LtxBadges'
+import { hasLtxFilename } from '@/features/ltx/model'
 
 const coverButtonClassName =
   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/70 text-white shadow-lg shadow-black/60 hover:bg-black/85 disabled:cursor-not-allowed disabled:opacity-40'
 
 export default function VideoCard({
-  video,
+  video: originalVideo,
   checked,
   onToggle,
   showSelection = true,
@@ -44,6 +46,10 @@ export default function VideoCard({
   onDeleteVideo,
   onTagClick,
 }) {
+  const updatedVideo = useStore(
+    (state) => state.videoLocationUpdates?.[videoSelectionKey(originalVideo)]
+  )
+  const video = updatedVideo ? { ...originalVideo, ...updatedVideo } : originalVideo
   const useHostPaths = useStore((state) => hostPathsEnabled(state.config))
   const [editAnchorEl, setEditAnchorEl] = useState(null)
   const displayName = getVideoDisplayName(video)
@@ -187,6 +193,7 @@ export default function VideoCard({
           loading="lazy"
         />
         <HighlightBadge videos={[video]} className="absolute bottom-12 left-2 z-10" />
+        <LtxBadges code={javCode} videos={[video]} className="absolute left-2 top-10 z-10" />
         {javCode ? (
           <div
             className="absolute right-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate rounded bg-black/70 px-2 py-1 text-xs text-white"
@@ -383,6 +390,23 @@ export default function VideoCard({
         transformOrigin={{ vertical: 'center', horizontal: 'left' }}
       >
         <div className="flex min-w-[112px] flex-col p-1">
+          <button
+            type="button"
+            disabled={!onRenameVideo}
+            onClick={(event) => {
+              event.stopPropagation()
+              closeEditMenu()
+              onRenameVideo?.(video, { ltx: !hasLtxFilename(video.filename || video.path) })
+            }}
+            className="inline-flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-300 dark:hover:bg-ui-hover"
+          >
+            <LocalOfferOutlinedIcon className="h-4 w-4" fontSize="inherit" />
+            <span>
+              {hasLtxFilename(video.filename || video.path)
+                ? zh('取消 LTX 标记', 'Remove LTX label')
+                : zh('标记为 LTX', 'Mark as LTX')}
+            </span>
+          </button>
           <button
             type="button"
             onClick={handleRename}
