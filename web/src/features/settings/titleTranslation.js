@@ -26,7 +26,7 @@ function profileDraft(profile = {}, provider = {}) {
     model: profile.model || '',
     customAddress: Boolean(
       profile.base_url &&
-      profile.base_url.replace(/\/$/, '') !== provider.base_url?.replace(/\/$/, '')
+        profile.base_url.replace(/\/$/, '') !== provider.base_url?.replace(/\/$/, '')
     ),
     temperature: profile.temperature ?? '',
     thinking: Boolean(profile.thinking),
