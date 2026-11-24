@@ -80,6 +80,9 @@ jobs:
       - name: Test background tools and player cleanup from a console process
         run: go test -count=1 -timeout=2m ./internal/util ./internal/mpv -run 'Background|PlayerProcessHelper|PlayerManager|WindowsPlayerJob'
 
+      - name: Test LTX rename, ownership and catalogue cache on Windows
+        run: go test -count=1 -timeout=3m ./internal/video/ltx ./internal/ltxcatalog ./internal/api -run 'Test(Marked|RenameFamily|SnapshotValidationAndLastCompleteCache|Ltx)'
+
       - name: Test background tools and player cleanup from a GUI process
         run: go test -count=1 -timeout=2m -ldflags="-H windowsgui" ./internal/util ./internal/mpv -run 'Background|PlayerProcessHelper|PlayerManager|WindowsPlayerJob'
 
