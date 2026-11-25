@@ -83,6 +83,28 @@ jobs:
       - name: Test LTX rename, ownership and catalogue cache on Windows
         run: go test -count=1 -timeout=3m ./internal/video/ltx ./internal/ltxcatalog ./internal/api -run 'Test(Marked|RenameFamily|SnapshotValidationAndLastCompleteCache|Ltx)'
 
+      - name: Prepare release-matched MPV and verified FFmpeg for seek tests
+        shell: pwsh
+        run: |
+          # Same MPV release and FFmpeg binary/hash as scripts/cli/cli.mjs.
+          $seekMpvArchive = Join-Path $env:RUNNER_TEMP 'javboss-seek-mpv.zip'
+          $seekMpvDir = Join-Path $env:RUNNER_TEMP 'javboss-seek-mpv'
+          Invoke-WebRequest 'https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-x86_64-w64-mingw32.zip' -OutFile $seekMpvArchive
+          Expand-Archive $seekMpvArchive -DestinationPath $seekMpvDir
+          $seekMpv = @(Get-ChildItem $seekMpvDir -Recurse -Filter mpv.exe)
+          if ($seekMpv.Count -ne 1) { throw 'Expected exactly one bundled MPV executable' }
+          $seekFfmpeg = Join-Path $env:RUNNER_TEMP 'javboss-seek-ffmpeg.exe'
+          Invoke-WebRequest 'https://github.com/shaka-project/static-ffmpeg-binaries/releases/download/n8.1.2-1/ffmpeg-win-x64.exe' -OutFile $seekFfmpeg
+          if ((Get-FileHash $seekFfmpeg -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4044b3924c977ad31229d504c5d5b8685f9553124fbaff6e9c99048b42830341') { throw 'FFmpeg SHA-256 mismatch' }
+          & $seekMpv[0].FullName --version
+          Write-Output "JAVBOSS_SEEK_MPV_SHA256=$((Get-FileHash $seekMpv[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant())"
+          & $seekFfmpeg -version
+          "JAVBOSS_TEST_MPV=$($seekMpv[0].FullName)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "JAVBOSS_TEST_FFMPEG=$seekFfmpeg" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Test native MPV held keys, decoder status and performance settings
+        run: go test -v -count=3 -timeout=3m ./internal/mpv ./internal/api -run '^Test(AdaptiveSeekWithRealMPVKeyEvents|CanvasAndControlVisibilityLua|SeekAndDecoderConfiguration|PlayerPerformanceSettingsValidationAndPersistence)$'
+
       - name: Test background tools and player cleanup from a GUI process
         run: go test -count=1 -timeout=2m -ldflags="-H windowsgui" ./internal/util ./internal/mpv -run 'Background|PlayerProcessHelper|PlayerManager|WindowsPlayerJob'
 
