@@ -1,6 +1,7 @@
 package mpv
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -112,7 +113,11 @@ func TestPlaylistCoversLazyDeduplicationAndCleanup(t *testing.T) {
 		go func() {
 			defer server.Close()
 			var request ipcRequest
-			if json.NewDecoder(server).Decode(&request) != nil {
+			// MPV IPC is newline-delimited. Consume the entire frame before
+			// replying: net.Pipe has no socket buffer, so leaving the final
+			// newline unread can deadlock the client's Write against our reply.
+			raw, err := bufio.NewReader(server).ReadBytes('\n')
+			if err != nil || json.Unmarshal(raw, &request) != nil {
 				return
 			}
 			var reply map[string]json.RawMessage
