@@ -139,6 +139,8 @@ func updateConfig(c *gin.Context) {
 		PlayerReuseWindow         *bool                      `json:"player_reuse_window"`
 		PlayerResumePlayback      *bool                      `json:"player_resume_playback"`
 		PlayerShowHotkeyHint      *bool                      `json:"player_show_hotkey_hint"`
+		PlayerSeekMode            *string                    `json:"player_seek_mode"`
+		PlayerHWDec               *string                    `json:"player_hwdec"`
 		BrowserShowHotkeyHint     *bool                      `json:"browser_player_show_hotkey_hint"`
 		PlayerHotkeys             []playerHotkeyPayload      `json:"player_hotkeys"`
 		WebHotkeys                []webHotkeyPayload         `json:"web_hotkeys"`
@@ -152,6 +154,23 @@ func updateConfig(c *gin.Context) {
 	}
 
 	entries := make(map[string]string)
+	for _, option := range []struct {
+		key   string
+		value *string
+		valid map[string]bool
+	}{
+		{"player_seek_mode", req.PlayerSeekMode, map[string]bool{"adaptive": true, "exact": true}},
+		{"player_hwdec", req.PlayerHWDec, map[string]bool{"no": true, "auto": true}},
+	} {
+		if option.value == nil {
+			continue
+		}
+		if !option.valid[*option.value] {
+			respondLocalizedError(c, http.StatusBadRequest, "播放器跳转或解码设置无效", "Invalid player seek or decoder setting")
+			return
+		}
+		entries[option.key] = *option.value
+	}
 	if req.SubtitleAutoDownload != nil {
 		entries["subtitle_auto_download"] = strconv.FormatBool(*req.SubtitleAutoDownload)
 	}
@@ -650,6 +669,10 @@ func updateConfig(c *gin.Context) {
 		mpv.InvalidateHotkeysCache()
 		playerSessionResetNeeded = true
 	}
+	if req.PlayerSeekMode != nil {
+		mpv.InvalidateHotkeysCache()
+		playerSessionResetNeeded = true
+	}
 	if req.PlayerReuseWindow != nil {
 		mpv.InvalidateHotkeysCache()
 		playerSessionResetNeeded = true
@@ -664,7 +687,7 @@ func updateConfig(c *gin.Context) {
 		req.PlayerVolume != nil ||
 		req.PlayerOntop != nil ||
 		req.PlayerReuseWindow != nil ||
-		req.PlayerResumePlayback != nil {
+		req.PlayerResumePlayback != nil || req.PlayerHWDec != nil {
 		mpv.InvalidatePlayerConfigCache()
 		playerSessionResetNeeded = true
 	}

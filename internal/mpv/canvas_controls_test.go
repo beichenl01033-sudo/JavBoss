@@ -21,6 +21,7 @@ func TestCanvasAndControlVisibilityLua(t *testing.T) {
 	}
 	for _, tc := range []struct{ name, harness, source, marker string }{
 		{"click", "canvas_controls.lua", "javboss_control.lua", "CANVAS_CLICK_TESTS_PASSED"},
+		{"seek", "adaptive_seek.lua", "javboss_control.lua", "ADAPTIVE_SEEK_TESTS_PASSED"},
 		{"controls", "control_visibility.lua", "modernz.lua", "CONTROL_VISIBILITY_TESTS_PASSED"},
 		{"subtitles", "subtitle_button_status.lua", "modernz.lua", "SUBTITLE_BUTTON_STATUS_TESTS_PASSED"},
 	} {

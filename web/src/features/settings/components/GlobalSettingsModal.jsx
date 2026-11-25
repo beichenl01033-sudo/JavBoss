@@ -1,4 +1,5 @@
 import SubtitleSettings from '@/features/settings/components/SubtitleSettings'
+import PlayerPerformanceSettings from '@/features/settings/components/PlayerPerformanceSettings'
 import { useEffect, useState } from 'react'
 import { Switch } from '@mui/material'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
@@ -134,6 +135,8 @@ export default function GlobalSettingsModal({
   playerResumePlayback,
   playerVolume,
   playerShowHotkeyHint,
+  playerSeekMode = 'adaptive',
+  playerHWDec = 'no',
   onSavePlayerBasicSettings,
   browserPlayerResumePlayback,
   browserPlayerShowHotkeyHint,
@@ -177,6 +180,8 @@ export default function GlobalSettingsModal({
   const [playerResumePlaybackInput, setPlayerResumePlaybackInput] = useState(true)
   const [playerVolumeInput, setPlayerVolumeInput] = useState('')
   const [playerShowHotkeyHintInput, setPlayerShowHotkeyHintInput] = useState(true)
+  const [playerSeekModeInput, setPlayerSeekModeInput] = useState('adaptive')
+  const [playerHWDecInput, setPlayerHWDecInput] = useState('no')
   const [browserPlayerResumePlaybackInput, setBrowserPlayerResumePlaybackInput] = useState(true)
   const [browserPlayerShowHotkeyHintInput, setBrowserPlayerShowHotkeyHintInput] = useState(true)
   const [browserPlayerError, setBrowserPlayerError] = useState('')
@@ -203,6 +208,8 @@ export default function GlobalSettingsModal({
     ffmpegStatus?.source === 'builtin' ? zh('已内置', 'Built in') : zh('已安装', 'Installed')
 
   const resetPlayerBasicInputs = () => {
+    setPlayerSeekModeInput('adaptive')
+    setPlayerHWDecInput('no')
     setPlayerWindowWidthInput(String(PLAYER_BASIC_DEFAULTS.windowWidth))
     setPlayerWindowHeightInput(String(PLAYER_BASIC_DEFAULTS.windowHeight))
     setPlayerOntopInput(PLAYER_BASIC_DEFAULTS.ontop)
@@ -251,6 +258,8 @@ export default function GlobalSettingsModal({
       setPlayerResumePlaybackInput(playerResumePlayback ?? PLAYER_BASIC_DEFAULTS.resumePlayback)
       setPlayerVolumeInput(String(playerVolume ?? PLAYER_BASIC_DEFAULTS.volume))
       setPlayerShowHotkeyHintInput(playerShowHotkeyHint ?? PLAYER_BASIC_DEFAULTS.showHotkeyHint)
+      setPlayerSeekModeInput(playerSeekMode === 'exact' ? 'exact' : 'adaptive')
+      setPlayerHWDecInput(playerHWDec === 'auto' ? 'auto' : 'no')
       setBrowserPlayerResumePlaybackInput(
         browserPlayerResumePlayback ?? BROWSER_PLAYER_DEFAULTS.resumePlayback
       )
@@ -279,6 +288,8 @@ export default function GlobalSettingsModal({
     playerResumePlayback,
     playerVolume,
     playerShowHotkeyHint,
+    playerSeekMode,
+    playerHWDec,
     browserPlayerResumePlayback,
     browserPlayerShowHotkeyHint,
     mpvEnabled,
@@ -1071,6 +1082,20 @@ export default function GlobalSettingsModal({
                 </section>
               </div>
 
+              <PlayerPerformanceSettings
+                seekMode={playerSeekModeInput}
+                hwdec={playerHWDecInput}
+                onSeekModeChange={(value) => {
+                  setPlayerSeekModeInput(value)
+                  setPlayerBasicError('')
+                  setPlayerBasicSuccess('')
+                }}
+                onHWDecChange={(value) => {
+                  setPlayerHWDecInput(value)
+                  setPlayerBasicError('')
+                  setPlayerBasicSuccess('')
+                }}
+              />
               {playerBasicError && (
                 <div className="mt-3 text-sm text-red-600 dark:text-red-300">
                   {playerBasicError}
@@ -1128,6 +1153,8 @@ export default function GlobalSettingsModal({
                         player_resume_playback: playerResumePlaybackInput,
                         player_volume: volume,
                         player_show_hotkey_hint: playerShowHotkeyHintInput,
+                        player_seek_mode: playerSeekModeInput,
+                        player_hwdec: playerHWDecInput,
                       })
                       setPlayerBasicSuccess(
                         zh('MPV播放器设置保存成功', 'MPV player settings saved')

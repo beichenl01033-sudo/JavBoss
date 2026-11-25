@@ -162,6 +162,8 @@ export default function GlobalSettings({ onToast, open, onClose }) {
               String(config.player_show_hotkey_hint).trim().toLowerCase()
             )
       }
+      playerSeekMode={config?.player_seek_mode === 'exact' ? 'exact' : 'adaptive'}
+      playerHWDec={config?.player_hwdec === 'auto' ? 'auto' : 'no'}
       onSavePlayerBasicSettings={async (payload) => {
         const cfg = await updateConfig(payload)
         useStore.setState({ config: cfg })
