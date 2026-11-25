@@ -19,7 +19,8 @@ local fake_input = {
 }
 local function property(name, fallback) if properties[name] == nil then return fallback end return properties[name] end
 local fake_mp = {
-    get_property = property, get_property_number = property, get_property_native = property,
+    get_property = property, get_property_number = property, get_property_native = property, get_property_bool = property,
+    set_property_native = function(name, value) properties[name] = value end,
     get_time = function() return now end,
     get_mouse_pos = function() return x, y end,
     get_osd_size = function() return 1000, 700 end,

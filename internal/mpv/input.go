@@ -21,6 +21,8 @@ const playerOntopConfigKey = "player_ontop"
 const playerReuseWindowConfigKey = "player_reuse_window"
 const playerResumePlaybackConfigKey = "player_resume_playback"
 const playerShowHotkeyHintConfigKey = "player_show_hotkey_hint"
+const playerSeekModeConfigKey = "player_seek_mode"
+const playerHWDecConfigKey = "player_hwdec"
 
 const (
 	defaultWindowWidth  = 80
@@ -151,6 +153,11 @@ func buildInputConfContent() (string, error) {
 	}
 
 	var lines []string
+	settings, err := loadPlayerConfig()
+	if err != nil {
+		logging.Error("list player seek settings failed, using defaults: %v", err)
+		settings = nil
+	}
 	for _, item := range hotkeys {
 		keyName, ok := keyName(item.Key)
 		if !ok {
@@ -159,7 +166,11 @@ func buildInputConfContent() (string, error) {
 
 		switch item.Action {
 		case "seek":
-			lines = append(lines, fmt.Sprintf("%s no-osd seek %s exact", keyName, formatAmount(item.Amount)))
+			if settings[playerSeekModeConfigKey] == "exact" {
+				lines = append(lines, fmt.Sprintf("%s no-osd seek %s exact", keyName, formatAmount(item.Amount)))
+			} else {
+				lines = append(lines, fmt.Sprintf("%s script-binding javboss_control/adaptive-seek %s", keyName, formatAmount(item.Amount)))
+			}
 		case "volume":
 			lines = append(lines, fmt.Sprintf("%s no-osd add volume %s", keyName, formatAmount(item.Amount)))
 		case "screenshot":
@@ -424,8 +435,18 @@ func buildConfigContent() (string, error) {
 		return "", err
 	}
 	resumePlayback := loadConfiguredPlayerResumePlayback()
+	settings, err := loadPlayerConfig()
+	if err != nil {
+		logging.Error("list player decoder settings failed, using defaults: %v", err)
+		settings = nil
+	}
+	hwdec := "no"
+	if settings[playerHWDecConfigKey] == "auto" {
+		hwdec = "auto"
+	}
 
 	lines := []string{
+		"hwdec=" + hwdec,
 		"osc=no",
 		"input-default-bindings=no",
 		"keep-open=yes",

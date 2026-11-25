@@ -101,6 +101,108 @@ local function filename_time(seconds)
     )
 end
 
+-- Only configured seek keys enter this controller. Highlights, clipping and the
+-- mouse seekbar keep their original precision. Targets use a logical position,
+-- never a keyframe-rounded time-pos, so repeated small steps cannot get stuck.
+local held_seek = nil
+local held_seek_timer = nil
+local function cancel_held_seek()
+    if held_seek_timer then held_seek_timer:kill(); held_seek_timer = nil end
+    held_seek = nil
+    mp.set_property_native("user-data/javboss/seek-preview", nil)
+end
+
+local function bounded_seek_target(at)
+    local duration = mp.get_property_number("duration", nil)
+    if duration and duration > 0 then at = math.min(at, math.max(0, duration - 0.05)) end
+    return math.max(0, at)
+end
+
+local function seek_context_valid(state)
+    return state.path == mp.get_property("path", nil) and state.entry == mp.get_property_number("playlist-pos", -1)
+end
+
+local function flush_held_seek()
+    local state = held_seek
+    if not state or not state.repeated or state.sent == state.target then return end
+    if not seek_context_valid(state) then cancel_held_seek(); return end
+    -- Wait while the current request is decoding/reading (including NAS reads).
+    -- Repeats update just one target; there is no growing command queue.
+    if mp.get_property_bool("seeking", false) then return end
+    state.sent = state.target
+    mp.commandv("no-osd", "seek", state.target, "absolute+keyframes")
+end
+
+local function adaptive_seek(event)
+    local same_key = not held_seek or not held_seek.key or not event.key_name or held_seek.key == event.key_name
+    if event.canceled then if same_key then cancel_held_seek() end; return end
+    if event.event == "up" then
+        local state = held_seek
+        if not state or not same_key then return end
+        if not seek_context_valid(state) then cancel_held_seek(); return end
+        local target = state.target
+        cancel_held_seek()
+        -- A single tap issues exactly one precise seek on release. A long hold
+        -- ends with exactly one precise correction, superseding coarse preview.
+        mp.commandv("no-osd", "seek", target, "absolute+exact")
+        return
+    end
+    local amount = tonumber(event.arg)
+    if not amount or amount ~= amount or math.abs(amount) == math.huge or amount == 0 then return end
+    local at = mp.get_property_number("time-pos", nil)
+    if not at or not mp.get_property_bool("seekable", false) then return end
+    if event.event == "press" then
+        cancel_held_seek()
+        mp.commandv("no-osd", "seek", bounded_seek_target(at + amount), "absolute+exact")
+    elseif event.event == "down" then
+        cancel_held_seek()
+        held_seek = { target = bounded_seek_target(at + amount), amount = amount, key = event.key_name, repeated = false,
+            path = mp.get_property("path", nil), entry = mp.get_property_number("playlist-pos", -1) }
+        mp.set_property_native("user-data/javboss/seek-preview", { target = held_seek.target })
+    elseif event.event == "repeat" and held_seek and same_key and held_seek.amount == amount then
+        held_seek.target = bounded_seek_target(held_seek.target + amount)
+        held_seek.repeated = true
+        mp.set_property_native("user-data/javboss/seek-preview", { target = held_seek.target })
+        if not held_seek_timer then
+            flush_held_seek()
+            held_seek_timer = mp.add_periodic_timer(0.125, flush_held_seek)
+        end
+    end
+end
+
+mp.add_key_binding(nil, "adaptive-seek", adaptive_seek, { complex = true })
+mp.register_event("start-file", cancel_held_seek)
+mp.register_event("end-file", cancel_held_seek)
+mp.observe_property("focused", "bool", function(_, focused) if focused == false then cancel_held_seek() end end)
+mp.observe_property("window-minimized", "bool", function(_, minimized) if minimized then cancel_held_seek() end end)
+
+local function decoder_status()
+    local requested = mp.get_property("hwdec", "no")
+    local active = mp.get_property("hwdec-current", nil)
+    local codec = mp.get_property("video-format", nil)
+    local label
+    if not codec then label = "无视频或等待视频加载"
+    elseif not active then label = "解码器初始化中"
+    elseif active == "no" then label = requested == "no" and "软件解码" or "软件解码（自动硬解未使用）"
+    else label = "硬件解码 · " .. active end
+    return { requested = requested, active = active, codec = codec, label = label }
+end
+
+local function publish_decoder_status()
+    mp.set_property_native("user-data/javboss/decoder-status", decoder_status())
+end
+
+local function show_decoder_status()
+    local status = decoder_status()
+    osd("解码：" .. status.label .. "\n编码：" .. (status.codec or "未知") ..
+        "\n设置：" .. (status.requested == "no" and "软件解码" or "自动硬解") ..
+        "\n丢帧：" .. tostring(mp.get_property_number("frame-drop-count", 0)), 5)
+end
+
+for _, property in ipairs({"hwdec", "hwdec-current", "video-format"}) do
+    mp.observe_property(property, "native", publish_decoder_status)
+end
+
 local function copy_chapter(chapter)
     return { time = tonumber(chapter.time) or 0, title = tostring(chapter.title or "") }
 end
@@ -204,6 +306,7 @@ local function step_playlist_point(direction)
 end
 
 local function seek_highlight(index)
+    cancel_held_seek()
     local item = highlights[index]
     if not item then return end
     local point = current_playlist_point()
@@ -539,6 +642,7 @@ local function more_menu()
     end
     local speed = mp.get_property_number("speed", 1) or 1
     add(string.format("倍速… (%gx)", speed), speed_menu)
+    add("解码：" .. decoder_status().label, show_decoder_status)
     local ontop = mp.get_property_native("ontop", false)
     add(ontop and "取消窗口置顶" or "窗口置顶", function()
         mp.set_property_bool("ontop", not mp.get_property_native("ontop", false))
@@ -568,6 +672,7 @@ local function more_menu()
 end
 
 local function clip_click()
+    cancel_held_seek()
     if not clip_supported() then
         osd("远程视频暂不支持剪辑")
         return
