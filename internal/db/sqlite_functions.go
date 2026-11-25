@@ -25,6 +25,9 @@ func registerSQLiteFunctions() string {
 				if err := conn.RegisterFunc("splitmix64", splitmix64SQL, true); err != nil {
 					return err
 				}
+				if err := conn.RegisterFunc("ltx_marked", ltxMarkedSQL, true); err != nil {
+					return err
+				}
 				return conn.RegisterFunc("stable_random_rank", stableRandomRankSQL, true)
 			},
 		})

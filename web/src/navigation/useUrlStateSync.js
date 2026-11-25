@@ -128,11 +128,26 @@ export default function useUrlStateSync({
         ...savedState,
         highlightOnly: currentUrlState.highlightOnly,
         highlightExclude: currentUrlState.highlightExclude,
+        ltxLocal: currentUrlState.ltxLocal,
+        ltxCatalog: currentUrlState.ltxCatalog,
         directoryId: directoryId || null,
         video: {
           ...savedState.video,
+          page:
+            savedState.ltxLocal !== currentUrlState.ltxLocal ||
+            savedState.ltxCatalog !== currentUrlState.ltxCatalog
+              ? 1
+              : savedState.video.page,
           directoryId: directoryId || null,
           subdirectory: directoryId ? currentUrlState.video.subdirectory : '',
+        },
+        jav: {
+          ...savedState.jav,
+          page:
+            savedState.ltxLocal !== currentUrlState.ltxLocal ||
+            savedState.ltxCatalog !== currentUrlState.ltxCatalog
+              ? 1
+              : savedState.jav.page,
         },
       }
       const nextUrl = buildUrlFromState(state, location.pathname)

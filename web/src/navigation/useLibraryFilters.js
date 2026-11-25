@@ -32,6 +32,8 @@ export default function useLibraryFilters({
     searchTerm,
     highlightOnly,
     highlightExclude,
+    ltxLocal,
+    ltxCatalog,
     javSearchTerm,
     javTagOptions,
     config,
@@ -61,6 +63,8 @@ export default function useLibraryFilters({
       searchTerm: state.searchTerm,
       highlightOnly: state.highlightOnly,
       highlightExclude: state.highlightExclude,
+      ltxLocal: state.ltxLocal,
+      ltxCatalog: state.ltxCatalog,
       javSearchTerm: state.javSearchTerm,
       javTagOptions: state.javTagOptions,
       config: state.config,
@@ -305,8 +309,25 @@ export default function useLibraryFilters({
   )
 
   const activeFilterItems = useMemo(() => {
+    const ltxItems = []
+    if (ltxLocal)
+      ltxItems.push({
+        key: 'ltx-local',
+        label: ltxLocal === 'with' ? zh('已有 LTX', 'With LTX') : zh('没有 LTX', 'Without LTX'),
+        onRemove: () => useStore.getState().setLtxFilters({ ltxLocal: '' }),
+      })
+    if (ltxCatalog)
+      ltxItems.push({
+        key: 'ltx-catalog',
+        label: {
+          confirmed: zh('新站已确认收录', 'LTX confirmed'),
+          pending: zh('新站待确认', 'LTX pending'),
+          not_found: zh('新站未收录', 'LTX not listed'),
+        }[ltxCatalog],
+        onRemove: () => useStore.getState().setLtxFilters({ ltxCatalog: '' }),
+      })
     if (!isJavMode) {
-      const items = []
+      const items = [...ltxItems]
       if (highlightOnly || highlightExclude)
         items.push({
           key: 'highlights',
@@ -344,7 +365,7 @@ export default function useLibraryFilters({
       return items
     }
 
-    const items = []
+    const items = [...ltxItems]
     if (javTab === 'idol') return items
     const activeSearch = String(javSearchTerm || '').trim()
     if (activeSearch) {
@@ -460,6 +481,8 @@ export default function useLibraryFilters({
     config,
     highlightOnly,
     highlightExclude,
+    ltxLocal,
+    ltxCatalog,
     seriesItems,
     javItems,
     isJavMode,
@@ -492,6 +515,8 @@ export default function useLibraryFilters({
     if (!isJavMode) {
       setSearchInput('')
       updateVideoFilters({
+        ltxLocal: '',
+        ltxCatalog: '',
         highlightOnly: false,
         highlightExclude: false,
         selectedTags: [],
@@ -502,7 +527,7 @@ export default function useLibraryFilters({
       return
     }
     setJavSearchInput('')
-    const updates = { javSearchTerm: '' }
+    const updates = { javSearchTerm: '', ltxLocal: '', ltxCatalog: '' }
     if (javTab === 'list') {
       Object.assign(updates, {
         highlightOnly: false,

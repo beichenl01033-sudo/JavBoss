@@ -104,6 +104,8 @@ export default function JavQueryEditorModal({
   const preferChinese = useStore((state) => preferChineseSeries(state.config))
   const highlightOnly = useStore((state) => state.highlightOnly)
   const highlightExclude = useStore((state) => state.highlightExclude)
+  const ltxLocal = useStore((state) => state.ltxLocal)
+  const ltxCatalog = useStore((state) => state.ltxCatalog)
   const subdirectory = useStore((state) => state.videoSubdirectory)
   const prefixInputRef = useRef(null)
   const idolInputRef = useRef(null)
@@ -214,6 +216,8 @@ export default function JavQueryEditorModal({
     setFilterOptionsError('')
     const timeout = window.setTimeout(() => {
       fetchJavFilterOptions({
+        ltxLocal,
+        ltxCatalog,
         highlightOnly,
         highlightExclude,
         subdirectory,
@@ -272,6 +276,8 @@ export default function JavQueryEditorModal({
     favoriteGroupId,
     highlightOnly,
     highlightExclude,
+    ltxLocal,
+    ltxCatalog,
     subdirectory,
     idolOptions,
     idolSearch,

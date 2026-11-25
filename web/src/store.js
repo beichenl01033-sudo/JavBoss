@@ -1,4 +1,5 @@
 import { createListResources } from '@/query/createListResources'
+import { createLtxSlice } from '@/features/ltx/filters'
 import { createVideoSlice } from '@/state/createVideoSlice'
 import { createJavSlice } from '@/state/createJavSlice'
 import { createNavigationSlice } from '@/state/createNavigationSlice'
@@ -20,6 +21,7 @@ export function createAppState(set, get) {
     get().invalidateFavoriteRequests()
   }
   return {
+    ...createLtxSlice({ set, lists }),
     ...createWatchedTimeSlice({ set }),
     ...createVideoSlice({ set, get, lists }),
     ...createJavSlice({ set, get, lists }),

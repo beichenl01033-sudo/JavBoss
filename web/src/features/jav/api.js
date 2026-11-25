@@ -1,4 +1,5 @@
 import { apiFetch, jsonHeaders, apiError } from '@/api/client'
+import { appendLtxParams } from '@/features/ltx/filters'
 import { zh } from '@/utils/i18n'
 
 export function translateJavTitles(ids, options) {
@@ -193,6 +194,8 @@ export async function fetchJavItem(id) {
 }
 
 export async function fetchJavs({
+  ltxLocal = '',
+  ltxCatalog = '',
   highlightOnly = false,
   highlightExclude = false,
   limit = 25,
@@ -237,6 +240,7 @@ export async function fetchJavs({
   }
   if (highlightOnly) params.set('highlight_only', '1')
   else if (highlightExclude) params.set('highlight_only', '0')
+  appendLtxParams(params, { ltxLocal, ltxCatalog })
   const res = await apiFetch(`/jav?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -245,6 +249,8 @@ export async function fetchJavs({
 }
 
 export async function fetchJavFilterOptions({
+  ltxLocal = '',
+  ltxCatalog = '',
   highlightOnly = false,
   highlightExclude = false,
   search = '',
@@ -293,6 +299,7 @@ export async function fetchJavFilterOptions({
   }
   if (highlightOnly) params.set('highlight_only', '1')
   else if (highlightExclude) params.set('highlight_only', '0')
+  appendLtxParams(params, { ltxLocal, ltxCatalog })
   const res = await apiFetch(`/jav/filter-options?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -554,6 +561,8 @@ export async function removeJavTagFromJavs(tagId, javIds) {
 }
 
 export async function fetchJavIdols({
+  ltxLocal = '',
+  ltxCatalog = '',
   limit = 25,
   offset = 0,
   search = '',
@@ -580,6 +589,7 @@ export async function fetchJavIdols({
     params.set(`idol_${key}_min`, String(value.min))
     params.set(`idol_${key}_max`, String(value.max))
   }
+  appendLtxParams(params, { ltxLocal, ltxCatalog })
   const res = await apiFetch(`/jav/idols?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -660,6 +670,8 @@ export async function updateJavIdolCover(id, { javId = 0, cropLeft = 0.53 } = {}
 }
 
 export async function fetchJavStudios({
+  ltxLocal = '',
+  ltxCatalog = '',
   limit = 25,
   offset = 0,
   search = '',
@@ -677,6 +689,7 @@ export async function fetchJavStudios({
     params.set('directory_id', String(directoryId))
     if (subdirectory) params.set('subdirectory', subdirectory)
   }
+  appendLtxParams(params, { ltxLocal, ltxCatalog })
   const res = await apiFetch(`/jav/studios?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)
@@ -743,6 +756,8 @@ export async function fetchJavStudioPreview(id) {
 }
 
 export async function fetchJavSeries({
+  ltxLocal = '',
+  ltxCatalog = '',
   limit = 25,
   offset = 0,
   search = '',
@@ -760,6 +775,7 @@ export async function fetchJavSeries({
     params.set('directory_id', String(directoryId))
     if (subdirectory) params.set('subdirectory', subdirectory)
   }
+  appendLtxParams(params, { ltxLocal, ltxCatalog })
   const res = await apiFetch(`/jav/series?${params.toString()}`, { signal })
   if (!res.ok) {
     throw await apiError(res)

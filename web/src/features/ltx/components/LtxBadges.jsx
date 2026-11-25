@@ -9,6 +9,11 @@ const CatalogContext = createContext(null)
 export function LtxCatalogProvider({ children }) {
   const [catalog, setCatalog] = useState(null)
   useEffect(() => {
+    if (!catalog?.updatedAt) return
+    if (useStore.getState().ltxCatalog) void useStore.getState().refreshLtxResults()
+    window.dispatchEvent(new Event('javboss-ltx-changed'))
+  }, [catalog?.updatedAt])
+  useEffect(() => {
     let controller
     let lastFetch = 0
     const refresh = async () => {

@@ -26,6 +26,7 @@ import (
 )
 
 type javFilterQuery struct {
+	Ltx               dbpkg.LtxFilter
 	HighlightOnly     bool
 	HighlightExclude  bool
 	Subdirectory      string
@@ -42,11 +43,16 @@ type javFilterQuery struct {
 }
 
 func parseJavFilterQuery(c *gin.Context) (javFilterQuery, bool) {
+	ltxFilter, ok := parseLtxFilter(c)
+	if !ok {
+		return javFilterQuery{}, false
+	}
 	_, subdirectory, valid := parseVideoDirectoryFilter(c)
 	if !valid {
 		return javFilterQuery{}, false
 	}
 	query := javFilterQuery{
+		Ltx:              ltxFilter,
 		HighlightOnly:    queryBool(c, "highlight_only", false),
 		HighlightExclude: c.Query("highlight_only") != "" && !queryBool(c, "highlight_only", true),
 		Subdirectory:     subdirectory,
@@ -132,6 +138,7 @@ func searchJav(c *gin.Context) {
 	}
 
 	items, total, err := dbpkg.Default().SearchJavWithPrefixFilters(c.Request.Context(), filterQuery.IdolIDs, filterQuery.TagIDs, filterQuery.Search, filterQuery.Prefix, sort, limit, offset, seed, directoryIDs, dbpkg.JavSearchFilters{
+		Ltx:               filterQuery.Ltx,
 		HighlightOnly:     filterQuery.HighlightOnly,
 		HighlightExclude:  filterQuery.HighlightExclude,
 		Subdirectory:      filterQuery.Subdirectory,
@@ -173,6 +180,7 @@ func listJavFilterOptions(c *gin.Context) {
 		filterQuery.Prefix,
 		directoryIDs,
 		dbpkg.JavSearchFilters{
+			Ltx:               filterQuery.Ltx,
 			HighlightOnly:     filterQuery.HighlightOnly,
 			HighlightExclude:  filterQuery.HighlightExclude,
 			Subdirectory:      filterQuery.Subdirectory,

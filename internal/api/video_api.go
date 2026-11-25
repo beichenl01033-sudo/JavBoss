@@ -64,6 +64,11 @@ func listVideos(c *gin.Context) {
 
 	// highlight_only=0 explicitly selects unmarked videos; omission selects all.
 	filter := dbpkg.VideoFilter{HideJav: hideJav, Subdirectory: subdirectory, HighlightOnly: queryBool(c, "highlight_only", false), HighlightExclude: c.Query("highlight_only") != "" && !queryBool(c, "highlight_only", true)}
+	ltxFilter, valid := parseLtxFilter(c)
+	if !valid {
+		return
+	}
+	filter.Ltx = ltxFilter
 	videos, err := dbpkg.Default().ListVideos(c.Request.Context(), limit, offset, tagFilter, search, sort, seed, directoryIDs, filter)
 	if err != nil {
 		logging.Error("list videos error: %v", err)

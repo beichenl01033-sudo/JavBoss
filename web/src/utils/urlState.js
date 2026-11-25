@@ -6,6 +6,7 @@ import {
   normalizeJavSort,
 } from '@/constants/jav'
 import { normalizeVideoSort } from '@/constants/video'
+import { ltxQuery, appendLtxParams } from '@/features/ltx/filters'
 
 const RANDOM_SEED_MAX = 2147483646
 
@@ -139,11 +140,20 @@ export const parseUrlState = (searchString = window.location.search, options = {
 
   const highlightOnly = sp.get('highlight_only') === '1'
   const highlightExclude = sp.get('highlight_only') === '0'
-  return { view, directoryId, video, jav, highlightOnly, highlightExclude }
+  return {
+    view,
+    directoryId,
+    video,
+    jav,
+    highlightOnly,
+    highlightExclude,
+    ...ltxQuery({ ltxLocal: sp.get('ltx_local'), ltxCatalog: sp.get('ltx_catalog') }),
+  }
 }
 
 export const buildUrlFromState = (state, basePath = window.location.pathname) => {
   const sp = new URLSearchParams()
+  appendLtxParams(sp, state)
   if (state.highlightOnly) sp.set('highlight_only', '1')
   else if (state.highlightExclude) sp.set('highlight_only', '0')
   if (state.directoryId) {
@@ -253,6 +263,7 @@ export const normalizeUrlStateFromStore = (store, tagsByName) => {
 
   return {
     view: store.viewMode === 'jav' ? 'jav' : 'video',
+    ...ltxQuery(store),
     highlightOnly: Boolean(store.highlightOnly),
     highlightExclude: Boolean(store.highlightExclude),
     directoryId: store.selectedDirectoryId || null,
