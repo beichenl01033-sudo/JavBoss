@@ -83,6 +83,9 @@ func (store *Store) ListVideos(ctx context.Context, limit, offset int, tagNames 
 	}
 	query = applyDirectoryFilter(query, "video_location", directoryIDs)
 	query = applyVideoSubdirectoryFilter(query, filters)
+	if len(filters) > 0 {
+		query = applyLtxLocationFilter(query, "video_location", filters[0].Ltx, directoryIDs, filters[0].Subdirectory, false)
+	}
 	if useExpr {
 		query = query.Order(clause.OrderBy{Expression: orderExpr})
 	} else {
@@ -148,6 +151,9 @@ func (store *Store) CountVideos(ctx context.Context, tagNames []string, search s
 		}
 		base = applyDirectoryFilter(base, "video_location", directoryIDs)
 		base = applyVideoSubdirectoryFilter(base, filters)
+		if len(filters) > 0 {
+			base = applyLtxLocationFilter(base, "video_location", filters[0].Ltx, directoryIDs, filters[0].Subdirectory, false)
+		}
 		if like != "" {
 			base = base.Where("video_location.filename LIKE ? COLLATE NOCASE", like)
 		}
@@ -172,6 +178,9 @@ func (store *Store) CountVideos(ctx context.Context, tagNames []string, search s
 	}
 	sub = applyDirectoryFilter(sub, "video_location", directoryIDs)
 	sub = applyVideoSubdirectoryFilter(sub, filters)
+	if len(filters) > 0 {
+		sub = applyLtxLocationFilter(sub, "video_location", filters[0].Ltx, directoryIDs, filters[0].Subdirectory, false)
+	}
 
 	if like != "" {
 		sub = sub.Where("video_location.filename LIKE ? COLLATE NOCASE", like)

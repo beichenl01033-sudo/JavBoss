@@ -1,6 +1,7 @@
 import Tooltip from '@/shared/ui/Tooltip'
 import VideoDirectoryFilter from '@/features/video/components/VideoDirectoryFilter'
 import HighlightToolbar from '@/features/highlights/components/HighlightToolbar'
+import LtxFilters from '@/features/ltx/components/LtxFilters'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryAddCheckOutlinedIcon from '@mui/icons-material/LibraryAddCheckOutlined'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
@@ -587,6 +588,7 @@ export default function TopBar({
           ) : null}
 
           {!isJavDownload ? <VideoDirectoryFilter /> : null}
+          {!isJavDownload ? <LtxFilters /> : null}
 
           {(!isJavMode || javTab === 'list') && <HighlightToolbar />}
 

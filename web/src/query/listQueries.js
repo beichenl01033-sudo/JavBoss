@@ -1,4 +1,5 @@
 import { normalizeIdolProfileFilters, resolveJavSort } from '@/constants/jav'
+import { ltxQuery } from '@/features/ltx/filters'
 
 export const directoryScopeKey = (state) =>
   (state.directories || [])
@@ -11,6 +12,7 @@ export const directoryScopeKey = (state) =>
 
 export function videoQuery(state) {
   return {
+    ...ltxQuery(state),
     highlightOnly: Boolean(state.highlightOnly),
     highlightExclude: Boolean(state.highlightExclude),
     limit: state.pageSize,
@@ -27,6 +29,7 @@ export function videoQuery(state) {
 
 export function javQuery(state) {
   return {
+    ...ltxQuery(state),
     highlightOnly: Boolean(state.highlightOnly),
     highlightExclude: Boolean(state.highlightExclude),
     limit: state.javPageSize,
@@ -51,6 +54,7 @@ export function javQuery(state) {
 
 export function idolQuery(state) {
   return {
+    ...ltxQuery(state),
     limit: state.idolPageSize,
     offset: (state.idolPage - 1) * state.idolPageSize,
     search: state.javSearchTerm || '',
@@ -63,6 +67,7 @@ export function idolQuery(state) {
 }
 
 export const studioQuery = (state) => ({
+  ...ltxQuery(state),
   limit: state.studioPageSize,
   offset: (state.studioPage - 1) * state.studioPageSize,
   search: state.javSearchTerm || '',
@@ -71,6 +76,7 @@ export const studioQuery = (state) => ({
   subdirectory: state.videoSubdirectory || '',
 })
 export const seriesQuery = (state) => ({
+  ...ltxQuery(state),
   limit: state.seriesPageSize,
   offset: (state.seriesPage - 1) * state.seriesPageSize,
   search: state.javSearchTerm || '',

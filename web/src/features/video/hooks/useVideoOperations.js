@@ -98,6 +98,8 @@ export default function useVideoOperations({ showCenterToast, showToast }) {
             })),
           }
         })
+        await useStore.getState().refreshLtxResults()
+        window.dispatchEvent(new Event('javboss-ltx-changed'))
       } catch (err) {
         console.error(zh('重命名视频失败', 'Failed to rename video'), err)
         showCenterToast(getErrorMessage(err))

@@ -1,6 +1,9 @@
 import { apiFetch, apiError, jsonHeaders } from '@/api/client'
+import { appendLtxParams } from '@/features/ltx/filters'
 
 export async function fetchVideos({
+  ltxLocal = '',
+  ltxCatalog = '',
   limit = 25,
   offset = 0,
   tags = [],
@@ -28,6 +31,7 @@ export async function fetchVideos({
   params.set('hide_jav', hideJav ? '1' : '0')
   if (highlightOnly) params.set('highlight_only', '1')
   else if (highlightExclude) params.set('highlight_only', '0')
+  appendLtxParams(params, { ltxLocal, ltxCatalog })
   const res = await apiFetch(`/videos?${params.toString()}`, { signal })
   if (!res.ok) throw await apiError(res)
   const data = await res.json()

@@ -170,6 +170,7 @@ func (store *Store) SearchJav(ctx context.Context, idolIDs []int64, tagIDs []int
 
 // JavSearchFilters contains optional filters for a JAV list query.
 type JavSearchFilters struct {
+	Ltx               LtxFilter
 	HighlightOnly     bool
 	HighlightExclude  bool
 	Subdirectory      string
@@ -279,7 +280,7 @@ func (store *Store) SearchJavWithPrefixFilters(ctx context.Context, idolIDs []in
 	if err := query.Find(&items).Error; err != nil {
 		return nil, 0, fmt.Errorf("list jav: %w", err)
 	}
-	if err := store.attachJavLocationVideos(ctx, items, directoryIDs, VideoFilter{Subdirectory: filters.Subdirectory, HighlightOnly: filters.HighlightOnly, HighlightExclude: filters.HighlightExclude}); err != nil {
+	if err := store.attachJavLocationVideos(ctx, items, directoryIDs, VideoFilter{Ltx: filters.Ltx, Subdirectory: filters.Subdirectory, HighlightOnly: filters.HighlightOnly, HighlightExclude: filters.HighlightExclude}); err != nil {
 		return nil, 0, err
 	}
 	if err := store.attachVisibleJavTags(ctx, items); err != nil {
@@ -388,6 +389,9 @@ func (store *Store) attachJavLocationVideos(ctx context.Context, items []models.
 		Preload("Video.Tags")
 	query = applyDirectoryFilter(query, "video_location", directoryIDs)
 	query = applyVideoSubdirectoryFilter(query, filters)
+	if len(filters) > 0 {
+		query = applyLtxLocationFilter(query, "video_location", filters[0].Ltx, directoryIDs, filters[0].Subdirectory, false)
+	}
 	if err := query.
 		Find(&locations).Error; err != nil {
 		return fmt.Errorf("load jav video locations: %w", err)
@@ -1194,6 +1198,7 @@ func (store *Store) buildJavFilter(ctx context.Context, idolIDs []int64, tagIDs 
 		Where(activeDirectoryWhereSQL("d"))
 	validLocation = applyDirectoryFilter(validLocation, "vl", directoryIDs)
 	validLocation = applyLocationSubdirectory(validLocation, "vl", filters.Subdirectory)
+	validLocation = applyLtxLocationFilter(validLocation, "vl", filters.Ltx, directoryIDs, filters.Subdirectory, true)
 	if filters.HighlightOnly {
 		validLocation = validLocation.Where("vl.video_id IN (SELECT id FROM video WHERE highlight_count > 0)")
 	} else if filters.HighlightExclude {
@@ -1474,7 +1479,8 @@ func (store *Store) ListJavStudios(ctx context.Context, search string, limit, of
 	return store.ListJavStudiosInSubdirectory(ctx, search, limit, offset, directoryIDs, favoriteGroupID, "")
 }
 
-func (store *Store) ListJavStudiosInSubdirectory(ctx context.Context, search string, limit, offset int, directoryIDs []int64, favoriteGroupID int64, subdirectory string) ([]JavStudioSummary, int64, error) {
+func (store *Store) ListJavStudiosInSubdirectory(ctx context.Context, search string, limit, offset int, directoryIDs []int64, favoriteGroupID int64, subdirectory string, ltxFilters ...LtxFilter) ([]JavStudioSummary, int64, error) {
+	ltxFilter := firstLtxFilter(ltxFilters)
 	if limit <= 0 {
 		limit = 100
 	}
@@ -1491,6 +1497,7 @@ func (store *Store) ListJavStudiosInSubdirectory(ctx context.Context, search str
 	countBase = applyDirectoryFilter(countBase, "vl", directoryIDs)
 	countBase = applyLocationSubdirectory(countBase, "vl", subdirectory)
 	countBase = applyJavStudioSearch(countBase, search)
+	countBase = applyLtxLocationFilter(countBase, "vl", ltxFilter, directoryIDs, subdirectory, true)
 	if favoriteGroupID > 0 {
 		countBase = countBase.Joins("JOIN jav_favorite_map jfm_filter ON jfm_filter.entity_id = js.id AND jfm_filter.entity_type = ? AND jfm_filter.jav_favorite_group_id = ?", JavFavoriteEntityStudio, favoriteGroupID)
 	}
@@ -1510,6 +1517,7 @@ func (store *Store) ListJavStudiosInSubdirectory(ctx context.Context, search str
 	base = applyDirectoryFilter(base, "vl", directoryIDs)
 	base = applyLocationSubdirectory(base, "vl", subdirectory)
 	base = applyJavStudioSearch(base, search)
+	base = applyLtxLocationFilter(base, "vl", ltxFilter, directoryIDs, subdirectory, true)
 	if favoriteGroupID > 0 {
 		base = base.Joins("JOIN jav_favorite_map jfm_filter ON jfm_filter.entity_id = js.id AND jfm_filter.entity_type = ? AND jfm_filter.jav_favorite_group_id = ?", JavFavoriteEntityStudio, favoriteGroupID)
 	}
@@ -1527,10 +1535,10 @@ func (store *Store) ListJavStudiosInSubdirectory(ctx context.Context, search str
 		Scan(&items).Error; err != nil {
 		return nil, 0, fmt.Errorf("list jav studios: %w", err)
 	}
-	if err := store.attachJavStudioCodePrefixes(ctx, items, directoryIDs, subdirectory); err != nil {
+	if err := store.attachJavStudioCodePrefixes(ctx, items, directoryIDs, VideoFilter{Ltx: ltxFilter, Subdirectory: subdirectory}); err != nil {
 		return nil, 0, err
 	}
-	if err := store.attachJavStudioSeries(ctx, items, directoryIDs, subdirectory); err != nil {
+	if err := store.attachJavStudioSeries(ctx, items, directoryIDs, VideoFilter{Ltx: ltxFilter, Subdirectory: subdirectory}); err != nil {
 		return nil, 0, err
 	}
 	if err := store.attachJavStudioAliases(ctx, items); err != nil {
@@ -1767,7 +1775,11 @@ func replaceJavStudioAliasesTx(tx *gorm.DB, studioID int64, aliases []string) er
 	return nil
 }
 
-func (store *Store) attachJavStudioCodePrefixes(ctx context.Context, items []JavStudioSummary, directoryIDs []int64, subdirectories ...string) error {
+func (store *Store) attachJavStudioCodePrefixes(ctx context.Context, items []JavStudioSummary, directoryIDs []int64, filters ...VideoFilter) error {
+	filter := VideoFilter{}
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
 	if len(items) == 0 {
 		return nil
 	}
@@ -1801,7 +1813,8 @@ func (store *Store) attachJavStudioCodePrefixes(ctx context.Context, items []Jav
 		Group("j.studio_id, " + prefixExpr).
 		Order("j.studio_id, prefix")
 	query = applyDirectoryFilter(query, "vl", directoryIDs)
-	query = applyLocationSubdirectory(query, "vl", firstSubdirectory(subdirectories))
+	query = applyLocationSubdirectory(query, "vl", filter.Subdirectory)
+	query = applyLtxLocationFilter(query, "vl", filter.Ltx, directoryIDs, filter.Subdirectory, true)
 	if err := query.Scan(&rows).Error; err != nil {
 		return fmt.Errorf("load jav studio code prefixes: %w", err)
 	}
@@ -1821,7 +1834,11 @@ func (store *Store) attachJavStudioCodePrefixes(ctx context.Context, items []Jav
 	return nil
 }
 
-func (store *Store) attachJavStudioSeries(ctx context.Context, items []JavStudioSummary, directoryIDs []int64, subdirectories ...string) error {
+func (store *Store) attachJavStudioSeries(ctx context.Context, items []JavStudioSummary, directoryIDs []int64, filters ...VideoFilter) error {
+	filter := VideoFilter{}
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
 	if len(items) == 0 {
 		return nil
 	}
@@ -1862,7 +1879,8 @@ func (store *Store) attachJavStudioSeries(ctx context.Context, items []JavStudio
 		Group("j.studio_id, js.id, js.name, js.zh_name, js.studio_id, jst.name, favorite_counts.favorite_count").
 		Order("j.studio_id, work_count DESC, js.name ASC")
 	query = applyDirectoryFilter(query, "vl", directoryIDs)
-	query = applyLocationSubdirectory(query, "vl", firstSubdirectory(subdirectories))
+	query = applyLocationSubdirectory(query, "vl", filter.Subdirectory)
+	query = applyLtxLocationFilter(query, "vl", filter.Ltx, directoryIDs, filter.Subdirectory, true)
 	if err := query.Scan(&rows).Error; err != nil {
 		return fmt.Errorf("load jav studio series: %w", err)
 	}
@@ -1917,7 +1935,8 @@ func (store *Store) ListJavSeries(ctx context.Context, search string, limit, off
 	return store.ListJavSeriesInSubdirectory(ctx, search, limit, offset, directoryIDs, favoriteGroupID, "")
 }
 
-func (store *Store) ListJavSeriesInSubdirectory(ctx context.Context, search string, limit, offset int, directoryIDs []int64, favoriteGroupID int64, subdirectory string) ([]JavSeriesSummary, int64, error) {
+func (store *Store) ListJavSeriesInSubdirectory(ctx context.Context, search string, limit, offset int, directoryIDs []int64, favoriteGroupID int64, subdirectory string, ltxFilters ...LtxFilter) ([]JavSeriesSummary, int64, error) {
+	ltxFilter := firstLtxFilter(ltxFilters)
 	if limit <= 0 {
 		limit = 100
 	}
@@ -1934,6 +1953,7 @@ func (store *Store) ListJavSeriesInSubdirectory(ctx context.Context, search stri
 	countBase = applyDirectoryFilter(countBase, "vl", directoryIDs)
 	countBase = applyLocationSubdirectory(countBase, "vl", subdirectory)
 	countBase = applyJavSeriesSearch(countBase, search)
+	countBase = applyLtxLocationFilter(countBase, "vl", ltxFilter, directoryIDs, subdirectory, true)
 	if favoriteGroupID > 0 {
 		countBase = countBase.Joins("JOIN jav_favorite_map jfm_filter ON jfm_filter.entity_id = js.id AND jfm_filter.entity_type = ? AND jfm_filter.jav_favorite_group_id = ?", JavFavoriteEntitySeries, favoriteGroupID)
 	}
@@ -1955,6 +1975,7 @@ func (store *Store) ListJavSeriesInSubdirectory(ctx context.Context, search stri
 	base = applyDirectoryFilter(base, "vl", directoryIDs)
 	base = applyLocationSubdirectory(base, "vl", subdirectory)
 	base = applyJavSeriesSearch(base, search)
+	base = applyLtxLocationFilter(base, "vl", ltxFilter, directoryIDs, subdirectory, true)
 	if favoriteGroupID > 0 {
 		base = base.Joins("JOIN jav_favorite_map jfm_filter ON jfm_filter.entity_id = js.id AND jfm_filter.entity_type = ? AND jfm_filter.jav_favorite_group_id = ?", JavFavoriteEntitySeries, favoriteGroupID)
 	}
@@ -2060,6 +2081,7 @@ type JavIdolIntRange struct {
 
 // JavIdolFilters contains optional profile ranges for the idol list.
 type JavIdolFilters struct {
+	Ltx          LtxFilter
 	Subdirectory string
 	Height       JavIdolIntRange
 	Age          JavIdolIntRange
@@ -2229,6 +2251,7 @@ func (store *Store) ListJavIdols(ctx context.Context, search, sort string, limit
 	}
 	filterDate := time.Now().UTC()
 	soloIdols := store.buildVisibleSoloIdolCoverQuery(ctx, directoryIDs, filters.Subdirectory)
+	soloIdols = applyLtxLocationFilter(soloIdols, "vl_solo", filters.Ltx, directoryIDs, filters.Subdirectory, true)
 
 	countBase := store.conn.WithContext(ctx).
 		Table("jav_idol ji").
@@ -2306,6 +2329,7 @@ func (store *Store) ListJavIdols(ctx context.Context, search, sort string, limit
 	}
 	base = applyDirectoryFilter(base, "vl", directoryIDs)
 	base = applyLocationSubdirectory(base, "vl", filters.Subdirectory)
+	base = applyLtxLocationFilter(base, "vl", filters.Ltx, directoryIDs, filters.Subdirectory, true)
 	base = applyJavIdolSearch(base, search)
 	base = applyJavIdolFilters(base, filters, filterDate)
 	if err := base.

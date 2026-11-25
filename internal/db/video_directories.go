@@ -14,6 +14,7 @@ import (
 
 // VideoFilter narrows the active locations returned by ListVideos and CountVideos.
 type VideoFilter struct {
+	Ltx              LtxFilter
 	HideJav          bool
 	Subdirectory     string
 	HighlightOnly    bool

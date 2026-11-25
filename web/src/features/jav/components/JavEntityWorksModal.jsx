@@ -8,6 +8,7 @@ import JavGrid from '@/features/jav/components/JavGrid'
 import Pagination from '@/shared/ui/Pagination'
 import AppModal from '@/shared/ui/AppModal'
 import HighlightToolbar from '@/features/highlights/components/HighlightToolbar'
+import LtxFilters from '@/features/ltx/components/LtxFilters'
 import { useStore } from '@/store'
 import { getErrorMessage } from '@/utils/errors'
 import { zh } from '@/utils/i18n'
@@ -63,11 +64,21 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
   const [highlightOnly, setHighlightOnly] = useState(globalHighlightOnly)
   const globalHighlightExclude = useStore((state) => state.highlightExclude)
   const [highlightExclude, setHighlightExclude] = useState(globalHighlightExclude)
+  const globalLtxLocal = useStore((state) => state.ltxLocal)
+  const globalLtxCatalog = useStore((state) => state.ltxCatalog)
+  const [ltxFilters, setLtxFilters] = useState({
+    ltxLocal: globalLtxLocal,
+    ltxCatalog: globalLtxCatalog,
+  })
   const [highlightRevision, setHighlightRevision] = useState(0)
   useEffect(() => {
     const refresh = () => setHighlightRevision((current) => current + 1)
     window.addEventListener('javboss-highlights-changed', refresh)
-    return () => window.removeEventListener('javboss-highlights-changed', refresh)
+    window.addEventListener('javboss-ltx-changed', refresh)
+    return () => {
+      window.removeEventListener('javboss-highlights-changed', refresh)
+      window.removeEventListener('javboss-ltx-changed', refresh)
+    }
   }, [])
   const scrollRef = useRef(null)
   const filters = useMemo(() => javEntityFilters(entity), [entity])
@@ -90,6 +101,7 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
     setLoading(true)
     setError('')
     fetchJavs({
+      ...ltxFilters,
       limit: pageSize,
       offset: (page - 1) * pageSize,
       sort,
@@ -101,8 +113,16 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
       ...filters,
     })
       .then((result) => {
+        if (controller.signal.aborted) return
+        const nextTotal = Number(result?.total) || 0
+        const nextLastPage = Math.max(1, Math.ceil(nextTotal / pageSize))
+        if (page > nextLastPage) {
+          setTotal(nextTotal)
+          setPage(nextLastPage)
+          return
+        }
         setItems(Array.isArray(result?.items) ? result.items : [])
-        setTotal(Number(result?.total) || 0)
+        setTotal(nextTotal)
       })
       .catch((err) => {
         if (err?.name !== 'AbortError') setError(getErrorMessage(err))
@@ -121,6 +141,7 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
     highlightOnly,
     highlightExclude,
     highlightRevision,
+    ltxFilters,
   ])
 
   useEffect(() => {
@@ -160,8 +181,19 @@ export default function JavEntityWorksModal({ entity, onClose, buildJavUrl, acti
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-5">
         <div className="mb-4 flex flex-wrap items-center gap-3">
+          <LtxFilters
+            local={ltxFilters.ltxLocal}
+            catalog={ltxFilters.ltxCatalog}
+            onChange={(updates) => {
+              setLtxFilters((current) => ({ ...current, ...updates }))
+              setPage(1)
+            }}
+          />
           <HighlightToolbar
             query={{
+              ...ltxFilters,
+              highlightOnly,
+              highlightExclude,
               ...filters,
               sort,
               directoryId: selectedDirectoryId,

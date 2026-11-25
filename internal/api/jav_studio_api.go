@@ -35,7 +35,11 @@ func listJavStudios(c *gin.Context) {
 		return
 	}
 
-	items, total, err := dbpkg.Default().ListJavStudiosInSubdirectory(c.Request.Context(), search, limit, offset, directoryIDs, favoriteGroupID, subdirectory)
+	ltxFilter, ok := parseLtxFilter(c)
+	if !ok {
+		return
+	}
+	items, total, err := dbpkg.Default().ListJavStudiosInSubdirectory(c.Request.Context(), search, limit, offset, directoryIDs, favoriteGroupID, subdirectory, ltxFilter)
 	if err != nil {
 		logging.Error("list jav studios: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载片商列表失败", "Failed to load studios")
@@ -172,7 +176,11 @@ func listJavSeries(c *gin.Context) {
 	if !valid {
 		return
 	}
-	items, total, err := dbpkg.Default().ListJavSeriesInSubdirectory(c.Request.Context(), search, limit, offset, directoryIDs, favoriteGroupID, subdirectory)
+	ltxFilter, valid := parseLtxFilter(c)
+	if !valid {
+		return
+	}
+	items, total, err := dbpkg.Default().ListJavSeriesInSubdirectory(c.Request.Context(), search, limit, offset, directoryIDs, favoriteGroupID, subdirectory, ltxFilter)
 	if err != nil {
 		logging.Error("list jav series: %v", err)
 		respondLocalizedError(c, http.StatusInternalServerError, "加载系列列表失败", "Failed to load series")
