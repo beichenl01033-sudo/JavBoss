@@ -3,10 +3,12 @@ package mpv
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -26,7 +28,7 @@ func TestAdaptiveSeekWithRealMPVKeyEvents(t *testing.T) {
 		}
 		command := exec.CommandContext(ctx, executable, "-test.run=^TestAdaptiveSeekWithRealMPVKeyEvents$")
 		command.Env = append(os.Environ(), "JAVBOSS_ADAPTIVE_SEEK_HELPER=1")
-		if output, err := command.CombinedOutput(); err != nil {
+		if output, err := command.CombinedOutput(); err != nil || !strings.Contains(string(output), "ADAPTIVE_SEEK_RUNTIME_PASSED") {
 			t.Fatalf("adaptive seek integration: %v\n%s", err, output)
 		}
 		return
@@ -165,6 +167,7 @@ func TestAdaptiveSeekWithRealMPVKeyEvents(t *testing.T) {
 	command("stop")
 	command("keyup", "RIGHT")
 	waitAdaptiveSeekProperty(t, endpoint, "user-data/javboss/seek-preview", nil)
+	fmt.Println("ADAPTIVE_SEEK_RUNTIME_PASSED")
 }
 
 func readAdaptiveSeekProperty(t *testing.T, endpoint, name string) any {
