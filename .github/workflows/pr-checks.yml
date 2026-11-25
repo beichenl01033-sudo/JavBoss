@@ -92,6 +92,13 @@ jobs:
           Invoke-WebRequest 'https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-x86_64-w64-mingw32.zip' -OutFile $seekMpvArchive
           Expand-Archive $seekMpvArchive -DestinationPath $seekMpvDir
           $seekMpv = @(Get-ChildItem $seekMpvDir -Recurse -Filter mpv.exe)
+          # The official release ZIP wraps a second ZIP, as handled by the CLI.
+          for ($seekDepth = 0; $seekDepth -lt 2 -and $seekMpv.Count -eq 0; $seekDepth++) {
+            foreach ($seekNested in @(Get-ChildItem $seekMpvDir -Recurse -Filter '*.zip')) {
+              Expand-Archive $seekNested.FullName -DestinationPath "$($seekNested.FullName).unpacked" -Force
+            }
+            $seekMpv = @(Get-ChildItem $seekMpvDir -Recurse -Filter mpv.exe)
+          }
           if ($seekMpv.Count -ne 1) { throw 'Expected exactly one bundled MPV executable' }
           $seekFfmpeg = Join-Path $env:RUNNER_TEMP 'javboss-seek-ffmpeg.exe'
           Invoke-WebRequest 'https://github.com/shaka-project/static-ffmpeg-binaries/releases/download/n8.1.2-1/ffmpeg-win-x64.exe' -OutFile $seekFfmpeg
